@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "管理能力模型（六域 × L1-L5 行为锚定）",
+  "type": "object",
+  "properties": {
+    "STRAT": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "const": "战略思维"
+        },
+        "anchors": {
+          "type": "object",
+          "properties": {
+            "1": {
+              "const": "了解公司战略方向与自身工作的关系"
+            },
+            "2": {
+              "const": "能在本职工作中对齐部门目标并识别偏差"
+            },
+            "3": {
+              "const": "能分析业务问题的结构性因素并提出改进方案"
+            },
+            "4": {
+              "const": "能主导制定本业务线策略并争取配套资源"
+            },
+            "5": {
+              "const": "能主持制定公司级战略并推动全员共识"
+            }
+          }
+        }
+      }
+    },
+    "TEAM": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "const": "团队领导"
+        },
+        "anchors": {
+          "type": "object",
+          "properties": {
+            "1": {
+              "const": "遵守团队规范，主动补位不拆台"
+            },
+            "2": {
+              "const": "能带领小组完成任务并化解日常摩擦"
+            },
+            "3": {
+              "const": "能组建管理跨职能团队，处理绩效与冲突"
+            },
+            "4": {
+              "const": "能打造高绩效团队文化并培养骨干梯队"
+            },
+            "5": {
+              "const": "能塑造组织级领导力文化与人才供应链"
+            }
+          }
+        }
+      }
+    },
+    "CHANGE": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "const": "变革管理"
+        },
+        "anchors": {
+          "type": "object",
+          "properties": {
+            "1": {
+              "const": "理解变革必要性，配合执行不传播负面情绪"
+            },
+            "2": {
+              "const": "能在变革中稳定团队情绪并准确传达信息"
+            },
+            "3": {
+              "const": "能主导小范围变革项目并管理抵触情绪"
+            },
+            "4": {
+              "const": "能主导组织级变革，设计利益相关者策略"
+            },
+            "5": {
+              "const": "能引领战略性转型与文化重塑"
+            }
+          }
+        }
+      }
+    },
+    "COMM": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "const": "沟通影响"
+        },
+        "anchors": {
+          "type": "object",
+          "properties": {
+            "1": {
+              "const": "表达清晰，倾听无明显偏差"
+            },
+            "2": {
+              "const": "能主持会议与跨岗位日常沟通"
+            },
+            "3": {
+              "const": "能影响平级与上级，推动跨部门共识"
+            },
+            "4": {
+              "const": "能主导关键对话与谈判，管理高层沟通"
+            },
+            "5": {
+              "const": "能代表组织对外布道、公关与博弈"
+            }
+          }
+        }
+      }
+    },
+    "COACH": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "const": "教练辅导"
+        },
+        "anchors": {
+          "type": "object",
+          "properties": {
+            "1": {
+              "const": "接受反馈并切实改进"
+            },
+            "2": {
+              "const": "能给出具体、及时、可操作的反馈"
+            },
+            "3": {
+              "const": "能教练下属改进绩效与发展关键能力"
+            },
+            "4": {
+              "const": "能建立团队辅导机制与人才盘点机制"
+            },
+            "5": {
+              "const": "能构建组织级人才发展与继任体系"
+            }
+          }
+        }
+      }
+    },
+    "EXEC": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "const": "执行落地"
+        },
+        "anchors": {
+          "type": "object",
+          "properties": {
+            "1": {
+              "const": "按时保质完成分配任务"
+            },
+            "2": {
+              "const": "能管理个人优先级与承诺闭环"
+            },
+            "3": {
+              "const": "能管理项目群，识别风险并及时纠偏"
+            },
+            "4": {
+              "const": "能设计流程机制保障组织级执行力"
+            },
+            "5": {
+              "const": "能重塑运营体系支撑战略达成"
+            }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

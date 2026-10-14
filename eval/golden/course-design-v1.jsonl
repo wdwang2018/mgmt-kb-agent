@@ -1,0 +1,24 @@
+{"kind":"need","id":"N01","need":{"audience":"新任经理","audience_level":2,"headcount":24,"duration_minutes":360,"business_pain":"新经理仍埋头做事，下属得不到成长","desired_behavior":"会授权、会给反馈、坚持 1on1","industry":"互联网","theme_hint":"新任管理者转型"},"expect":{"domains":["TEAM"],"dilemmas":["D01"]}}
+{"kind":"need","id":"N02","need":{"audience":"新晋升经理","audience_level":2,"headcount":18,"duration_minutes":360,"business_pain":"不敢授权，放了又乱，事事请示","desired_behavior":"按任务风险分级授权，建立检查点","industry":"零售","theme_hint":"新任管理者转型"},"expect":{"domains":["TEAM"],"dilemmas":["D02"]}}
+{"kind":"need","id":"N03","need":{"audience":"中层管理者","audience_level":3,"headcount":30,"duration_minutes":720,"business_pain":"战略会上都点头，散会后各干各的","desired_behavior":"建立战略共识机制，统一言-行-考","industry":"制造","theme_hint":"战略共识与解码"},"expect":{"domains":["STRAT"],"dilemmas":["D07"]}}
+{"kind":"need","id":"N04","need":{"audience":"部门负责人","audience_level":3,"headcount":25,"duration_minutes":360,"business_pain":"战略停在 PPT，执行断裂，资源还按去年盘子分","desired_behavior":"把战略解码为部门可执行的仗与承诺","industry":"金融","theme_hint":"战略共识与解码"},"expect":{"domains":["STRAT"],"dilemmas":["D08"]}}
+{"kind":"need","id":"N05","need":{"audience":"新任经理","audience_level":2,"headcount":20,"duration_minutes":360,"business_pain":"不敢给负面反馈，绩效面谈流于形式","desired_behavior":"用 SBI 给反馈，用 GROW 做辅导","industry":"软件","theme_hint":null},"expect":{"domains":["COACH"],"dilemmas":["D09"]}}
+{"kind":"need","id":"N06","need":{"audience":"高管团队","audience_level":5,"headcount":12,"duration_minutes":720,"business_pain":"战略方向迷失，对往哪打没有共识","desired_behavior":"形成诊断-指导方针-连贯行动的战略主张","industry":"医药","theme_hint":"战略共识与解码"},"expect":{"domains":["STRAT"],"dilemmas":["D06"]}}
+{"kind":"need","id":"N07","need":{"audience":"团队管理者","audience_level":3,"headcount":22,"duration_minutes":360,"business_pain":"团队内部摩擦内耗，跨部门协作扯皮","desired_behavior":"化解冲突，建立协作规范","industry":"互联网","theme_hint":null},"expect":{"domains":["TEAM"],"dilemmas":["D03"]}}
+{"kind":"need","id":"N08","need":{"audience":"中层管理者","audience_level":3,"headcount":28,"duration_minutes":360,"business_pain":"跨部门推不动，资源争夺，会议议而不决","desired_behavior":"建立跨部门协同与决策机制","industry":"制造","theme_hint":null},"expect":{"domains":["COMM"],"dilemmas":["D04"]}}
+{"kind":"need","id":"N09","need":{"audience":"业务负责人","audience_level":3,"headcount":26,"duration_minutes":360,"business_pain":"目标虚设，上下不一致，OKR 与 KPI 混用打架","desired_behavior":"按情境选型并上下对齐目标","industry":"互联网","theme_hint":"战略共识与解码"},"expect":{"domains":["STRAT"],"dilemmas":["D16"]}}
+{"kind":"need","id":"N10","need":{"audience":"新任经理","audience_level":2,"headcount":16,"duration_minutes":180,"business_pain":"被事务拖着走，不会排优先级，整天救火","desired_behavior":"建立个人节奏与优先级管理","industry":"金融","theme_hint":null},"expect":{"domains":["EXEC"],"dilemmas":["D17"]}}
+{"kind":"need","id":"N11","need":{"audience":"研发负责人","audience_level":3,"headcount":20,"duration_minutes":360,"business_pain":"怕犯错不试错，创新项目推不动","desired_behavior":"建立创新试错与容错机制","industry":"互联网","theme_hint":null},"expect":{"domains":["CHANGE"],"dilemmas":["D21"]}}
+{"kind":"need","id":"N12","need":{"audience":"变革推动者","audience_level":3,"headcount":30,"duration_minutes":720,"business_pain":"组织变革推不动，员工消极抵触","desired_behavior":"管理变革阻力，设计利益相关者策略","industry":"制造","theme_hint":null},"expect":{"domains":["CHANGE"],"dilemmas":["D05"]}}
+{"kind":"query","id":"Q01","query":"授权 两难 不敢放 放了乱","domains":["TEAM"],"dilemmas":["D02"],"expected_unit":"KU-LEAD-006"}
+{"kind":"query","id":"Q02","query":"GROW 教练模型 提问 目标 现状 方案","domains":["COACH"],"expected_unit":"KU-LEAD-004"}
+{"kind":"query","id":"Q03","query":"SBI 反馈 情境 行为 影响","domains":["COMM"],"expected_unit":"KU-LEAD-005"}
+{"kind":"query","id":"Q04","query":"1on1 会议 节奏 下属主导 谈人优先","expected_unit":"KU-LEAD-010"}
+{"kind":"query","id":"Q05","query":"新经理 角色转变 通过他人拿结果","expected_unit":"KU-LEAD-001"}
+{"kind":"query","id":"Q06","query":"战略解码 BEM 举措 行动方案 KPI","domains":["STRAT"],"expected_unit":"KU-STRAT-001"}
+{"kind":"query","id":"Q07","query":"平衡计分卡 战略地图 因果链 四维度","expected_unit":"KU-STRAT-002"}
+{"kind":"query","id":"Q08","query":"好战略 坏战略 诊断 指导方针 连贯行动","expected_unit":"KU-STRAT-003"}
+{"kind":"query","id":"Q09","query":"波特 五力 通用战略 差异化 夹在中间","expected_unit":"KU-STRAT-004"}
+{"kind":"query","id":"Q10","query":"VRIO 资源基础观 稀缺 难以模仿","expected_unit":"KU-STRAT-005"}
+{"kind":"query","id":"Q11","query":"OKR KPI 分工 考核 探索期","expected_unit":"KU-STRAT-007"}
+{"kind":"query","id":"Q12","query":"OGSM 一页纸 目的 目标 策略 衡量","expected_unit":"KU-STRAT-008"}

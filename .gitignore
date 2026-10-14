@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+# 运行产物
+output/
+runs/
+# 环境
+.env
+*.log
+.DS_Store
+# 工具缓存
+.playwright-cli/
+web/shot-*.png

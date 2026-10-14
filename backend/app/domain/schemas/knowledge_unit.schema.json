@@ -1,0 +1,265 @@
+{
+  "$defs": {
+    "EvidenceLevel": {
+      "enum": [
+        "A",
+        "B",
+        "C"
+      ],
+      "title": "EvidenceLevel",
+      "type": "string"
+    },
+    "KUType": {
+      "enum": [
+        "概念",
+        "理论",
+        "模型",
+        "工具",
+        "研究结论",
+        "方法论"
+      ],
+      "title": "KUType",
+      "type": "string"
+    },
+    "Misconception": {
+      "description": "学员常见误区 vs 理论纠正（G4 认知冲突门禁的数据源）。",
+      "properties": {
+        "claim": {
+          "description": "学员常见误区（错误的流行说法）",
+          "title": "Claim",
+          "type": "string"
+        },
+        "correction": {
+          "description": "理论/实证纠正",
+          "title": "Correction",
+          "type": "string"
+        }
+      },
+      "required": [
+        "claim",
+        "correction"
+      ],
+      "title": "Misconception",
+      "type": "object"
+    },
+    "Relation": {
+      "description": "图谱关系抽取产物（P0 落 JSON，P1 迁 Neo4j）。",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/RelationType"
+        },
+        "target": {
+          "description": "关系对象：学者名/学派名/单元ID/案例ID",
+          "title": "Target",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "type",
+        "target"
+      ],
+      "title": "Relation",
+      "type": "object"
+    },
+    "RelationType": {
+      "enum": [
+        "提出者",
+        "学派",
+        "争议",
+        "前置",
+        "应用",
+        "对比"
+      ],
+      "title": "RelationType",
+      "type": "string"
+    },
+    "SourceRef": {
+      "description": "引用定位：每个结论可回溯到 书名/作者/章节定位。",
+      "properties": {
+        "book": {
+          "description": "来源书名",
+          "title": "Book",
+          "type": "string"
+        },
+        "author": {
+          "description": "作者",
+          "title": "Author",
+          "type": "string"
+        },
+        "year": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Year"
+        },
+        "locator": {
+          "description": "定位：章节/页码/小节，如「第3章」",
+          "title": "Locator",
+          "type": "string"
+        },
+        "isbn": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Isbn"
+        },
+        "copyright_status": {
+          "default": "要点化",
+          "description": "版权状态：只存摘要+要点+引用定位，不整文复制",
+          "enum": [
+            "公版",
+            "授权",
+            "要点化",
+            "原创"
+          ],
+          "title": "Copyright Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "book",
+        "author",
+        "locator"
+      ],
+      "title": "SourceRef",
+      "type": "object"
+    }
+  },
+  "description": "L2 知识单元：概念/理论/模型/工具/研究结论，按管理困境挂接。",
+  "properties": {
+    "id": {
+      "pattern": "^KU-(LEAD|STRAT)-\\d{3}$",
+      "title": "Id",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "type": {
+      "$ref": "#/$defs/KUType"
+    },
+    "domains": {
+      "description": "胜任力域代码，如 TEAM/STRAT",
+      "items": {
+        "type": "string"
+      },
+      "title": "Domains",
+      "type": "array"
+    },
+    "dilemmas": {
+      "description": "困境索引代码，如 D01",
+      "items": {
+        "type": "string"
+      },
+      "title": "Dilemmas",
+      "type": "array"
+    },
+    "evidence_level": {
+      "$ref": "#/$defs/EvidenceLevel",
+      "description": "A: 实证强支持（多项研究/元分析支持，跨情境稳健）；B: 实证支持但情境依赖（有研究支持，边界条件明显）；C: 经验流派/争议并存（专家经验或流派观点，实证有限）"
+    },
+    "contested": {
+      "default": false,
+      "description": "是否存在学派争议，需并列呈现",
+      "title": "Contested",
+      "type": "boolean"
+    },
+    "source": {
+      "$ref": "#/$defs/SourceRef"
+    },
+    "key_points": {
+      "description": "要点化摘要（非原文复制）",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 2,
+      "title": "Key Points",
+      "type": "array"
+    },
+    "misconceptions": {
+      "items": {
+        "$ref": "#/$defs/Misconception"
+      },
+      "title": "Misconceptions",
+      "type": "array"
+    },
+    "applicable_context": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Applicable Context",
+      "type": "array"
+    },
+    "prerequisites": {
+      "description": "前置单元ID",
+      "items": {
+        "type": "string"
+      },
+      "title": "Prerequisites",
+      "type": "array"
+    },
+    "related": {
+      "description": "关联单元ID",
+      "items": {
+        "type": "string"
+      },
+      "title": "Related",
+      "type": "array"
+    },
+    "relations": {
+      "items": {
+        "$ref": "#/$defs/Relation"
+      },
+      "title": "Relations",
+      "type": "array"
+    },
+    "tools": {
+      "description": "[{name, usage}]",
+      "items": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "type": "object"
+      },
+      "title": "Tools",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "type",
+    "domains",
+    "dilemmas",
+    "evidence_level",
+    "source",
+    "key_points"
+  ],
+  "title": "知识单元（L2 层核心资产）",
+  "type": "object"
+}

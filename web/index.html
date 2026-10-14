@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:,">
+<title>管理学知识库 Agent · 工作台</title>
+<style>
+:root{
+  --bg:#f4f5fa; --panel:#fff; --border:#e5e7eb; --border-2:#d1d5db;
+  --text:#1f2937; --text-2:#6b7280; --text-3:#9ca3af;
+  --primary:#4f46e5; --primary-hover:#4338ca; --primary-soft:#eef2ff;
+  --green:#059669; --green-soft:#ecfdf5;
+  --amber:#b45309; --amber-soft:#fffbeb;
+  --red:#dc2626; --red-soft:#fef2f2;
+  --blue:#2563eb; --blue-soft:#eff6ff;
+  --shadow:0 1px 3px rgba(16,24,40,.06),0 1px 2px rgba(16,24,40,.04);
+  --radius:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  background:var(--bg); color:var(--text); font-size:14px; line-height:1.6;
+  display:flex; flex-direction:column;
+}
+button{font:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select,textarea{font:inherit;color:inherit}
+
+/* ---------- 顶栏 ---------- */
+header{
+  height:52px;background:var(--panel);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;padding:0 20px;flex-shrink:0;
+}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{
+  width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#4f46e5,#7c3aed);
+  color:#fff;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;
+}
+.brand .title{font-weight:600;font-size:15px}
+.brand .subtitle{font-size:12px;color:var(--text-2);margin-top:-2px}
+.pill{
+  font-size:12px;padding:3px 10px;border-radius:99px;border:1px solid var(--border);
+  color:var(--text-2);background:#fafafa;display:flex;align-items:center;gap:6px;white-space:nowrap;
+}
+.pill .dot{width:7px;height:7px;border-radius:50%;background:var(--text-3)}
+.pill.ok{color:var(--green);background:var(--green-soft);border-color:#a7f3d0}
+.pill.ok .dot{background:var(--green)}
+.pill.bad{color:var(--red);background:var(--red-soft);border-color:#fecaca}
+.pill.bad .dot{background:var(--red)}
+
+/* ---------- 布局 ---------- */
+.layout{flex:1;display:flex;min-height:0}
+.sidebar{
+  width:184px;background:var(--panel);border-right:1px solid var(--border);
+  padding:14px 10px;display:flex;flex-direction:column;gap:2px;flex-shrink:0;
+}
+.nav-item{
+  display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;
+  color:var(--text-2);font-size:13.5px;text-align:left;width:100%;
+}
+.nav-item:hover{background:#f3f4f6;color:var(--text)}
+.nav-item.active{background:var(--primary-soft);color:var(--primary);font-weight:600}
+.nav-item svg{width:16px;height:16px;flex-shrink:0}
+.sidebar-foot{margin-top:auto;padding:8px 10px;font-size:11.5px;color:var(--text-3);border-top:1px solid var(--border)}
+main{flex:1;overflow-y:auto;padding:20px 24px}
+.tab{display:none}
+.tab.active{display:block}
+
+/* ---------- 通用卡片与按钮 ---------- */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  padding:7px 16px;border-radius:8px;font-size:13.5px;font-weight:500;
+  border:1px solid var(--border-2);background:var(--panel);color:var(--text);
+  transition:all .15s;
+}
+.btn:hover{border-color:var(--primary);color:var(--primary)}
+.btn-primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary-hover);border-color:var(--primary-hover);color:#fff}
+.btn-danger:hover{border-color:var(--red);color:var(--red)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-sm{padding:4px 10px;font-size:12.5px}
+.hidden{display:none !important}
+
+/* ---------- 课程设计页 ---------- */
+.design-grid{display:grid;grid-template-columns:400px 1fr;gap:18px;align-items:start}
+@media (max-width:1080px){.design-grid{grid-template-columns:1fr}}
+.form-card h2{font-size:15px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.form-card h2 .tag{font-size:11px;font-weight:500;color:var(--primary);background:var(--primary-soft);padding:2px 8px;border-radius:99px}
+.form-card label{display:block;font-size:13px;color:var(--text-2);margin-bottom:12px}
+.form-card label:last-child{margin-bottom:0}
+.form-card input,.form-card select,.form-card textarea{
+  width:100%;margin-top:5px;padding:7px 10px;border:1px solid var(--border-2);border-radius:8px;background:#fff;
+  font-size:13.5px;outline:none;transition:border .15s;
+}
+.form-card input:focus,.form-card select:focus,.form-card textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+.form-card textarea{resize:vertical;min-height:56px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.chips{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.chip{
+  font-size:12px;padding:2px 10px;border-radius:99px;border:1px solid var(--border-2);
+  color:var(--text-2);background:#fafafa;
+}
+.chip:hover{border-color:var(--primary);color:var(--primary)}
+.form-actions{display:flex;gap:10px;margin-top:16px}
+.form-actions .btn{flex:1}
+
+.result-area{display:flex;flex-direction:column;gap:14px;min-height:400px}
+.empty-hint{color:var(--text-2);text-align:center;padding:60px 20px;border-style:dashed}
+.empty-hint .big{font-size:15px;color:var(--text);margin-bottom:6px;font-weight:600}
+.empty-hint p{font-size:13px}
+
+.running-head{display:flex;align-items:center;gap:10px;font-weight:600;font-size:14.5px;margin-bottom:16px}
+.running-head .run-id{font-weight:400;font-size:12px;color:var(--text-3);font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.spinner{
+  width:16px;height:16px;border:2px solid var(--primary-soft);border-top-color:var(--primary);
+  border-radius:50%;animation:spin 0.8s linear infinite;flex-shrink:0;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.stepper{list-style:none;display:flex;flex-direction:column;gap:0}
+.stepper li{
+  display:flex;align-items:center;gap:12px;padding:7px 0;position:relative;color:var(--text-3);
+}
+.stepper li .node{
+  width:22px;height:22px;border-radius:50%;border:2px solid var(--border-2);background:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;z-index:1;
+}
+.stepper li .label{font-size:13.5px}
+.stepper li::before{
+  content:"";position:absolute;left:10px;top:26px;bottom:-6px;width:2px;background:var(--border);
+}
+.stepper li:last-child::before{display:none}
+.stepper li.done{color:var(--text-2)}
+.stepper li.done .node{background:var(--green);border-color:var(--green);color:#fff}
+.stepper li.current{color:var(--primary);font-weight:600}
+.stepper li.current .node{border-color:var(--primary);color:var(--primary);box-shadow:0 0 0 4px var(--primary-soft)}
+.stepper li.current .label::after{content:" …";color:var(--primary)}
+.running-note{margin-top:14px;font-size:12.5px;color:var(--text-3);border-top:1px dashed var(--border);padding-top:10px}
+
+.human-head{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600;color:var(--amber);margin-bottom:6px}
+.human-sub{font-size:13px;color:var(--text-2);margin-bottom:14px}
+.human-body{margin-bottom:14px}
+.human-body table{width:100%;border-collapse:collapse;font-size:12.8px;margin:8px 0}
+.human-body th,.human-body td{border:1px solid var(--border);padding:6px 9px;text-align:left;vertical-align:top}
+.human-body th{background:#f9fafb;font-weight:600;white-space:nowrap}
+.issue-list{list-style:none;display:flex;flex-direction:column;gap:6px;margin:8px 0}
+.issue-list li{
+  background:var(--amber-soft);border:1px solid #fde68a;border-radius:8px;
+  padding:8px 12px;font-size:13px;color:#92400e;
+}
+.human-actions{display:flex;gap:10px;align-items:flex-start}
+.human-actions textarea{
+  width:100%;padding:8px 10px;border:1px solid var(--border-2);border-radius:8px;font-size:13px;
+  margin-bottom:10px;resize:vertical;min-height:60px;
+}
+.human-actions textarea:focus{outline:none;border-color:var(--primary)}
+
+.done-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.done-head h3{font-size:15px;color:var(--green);display:flex;align-items:center;gap:8px}
+.stat-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.stat{
+  flex:1;min-width:100px;background:#f9fafb;border:1px solid var(--border);border-radius:8px;
+  padding:10px 12px;text-align:center;
+}
+.stat .num{font-size:20px;font-weight:700;color:var(--primary)}
+.stat .lbl{font-size:12px;color:var(--text-2);margin-top:2px}
+.gate-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.gate-badge{
+  font-size:12px;padding:3px 10px;border-radius:99px;display:inline-flex;align-items:center;gap:5px;
+  background:var(--green-soft);color:var(--green);border:1px solid #a7f3d0;
+}
+.gate-badge.fail{background:var(--red-soft);color:var(--red);border-color:#fecaca}
+
+/* Markdown 渲染（课程包） */
+.md-paper{
+  border:1px solid var(--border);border-radius:8px;background:#fff;
+  padding:26px 30px;font-size:13.5px;line-height:1.75;max-height:640px;overflow-y:auto;
+}
+.md-paper h1{font-size:19px;margin:0 0 12px;padding-bottom:10px;border-bottom:2px solid var(--primary-soft)}
+.md-paper h2{font-size:15.5px;margin:22px 0 10px;padding-left:9px;border-left:3px solid var(--primary)}
+.md-paper h3{font-size:14px;margin:16px 0 8px;color:var(--primary-hover)}
+.md-paper p{margin:8px 0}
+.md-paper ul,.md-paper ol{margin:8px 0 8px 20px}
+.md-paper li{margin:3px 0}
+.md-paper li>ul{margin:2px 0 2px 18px}
+.md-paper table{border-collapse:collapse;width:100%;margin:10px 0;font-size:12.8px}
+.md-paper th,.md-paper td{border:1px solid var(--border);padding:6px 9px;text-align:left;vertical-align:top}
+.md-paper th{background:#f9fafb;font-weight:600}
+.md-paper tr:nth-child(even) td{background:#fafafa}
+.md-paper hr{border:none;border-top:1px solid var(--border);margin:16px 0}
+.md-paper code{background:#f3f4f6;border-radius:4px;padding:1px 5px;font-size:12px;font-family:ui-monospace,Consolas,monospace}
+.md-paper strong{color:#111827}
+.md-paper blockquote{border-left:3px solid var(--amber);background:var(--amber-soft);padding:8px 14px;margin:10px 0;border-radius:0 8px 8px 0;color:#92400e}
+
+/* ---------- 知识库页 ---------- */
+.kb-bar{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+.kb-bar input{
+  flex:1;min-width:240px;padding:8px 12px;border:1px solid var(--border-2);border-radius:8px;font-size:13.5px;outline:none;
+}
+.kb-bar input:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+.kb-bar select{padding:8px 10px;border:1px solid var(--border-2);border-radius:8px;font-size:13px;background:#fff;outline:none}
+.kb-count{font-size:12.5px;color:var(--text-3);margin-left:auto}
+.kb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
+.unit-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;display:flex;flex-direction:column;gap:8px}
+.unit-card .u-head{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.unit-card .u-title{font-size:14px;font-weight:600;line-height:1.4}
+.unit-card .u-id{font-size:11px;color:var(--text-3);font-family:ui-monospace,Consolas,monospace;white-space:nowrap}
+.badge{font-size:11px;padding:2px 8px;border-radius:99px;font-weight:500;white-space:nowrap}
+.badge-a{background:var(--green-soft);color:var(--green)}
+.badge-b{background:var(--blue-soft);color:var(--blue)}
+.badge-c{background:var(--amber-soft);color:var(--amber)}
+.badge-contested{background:#fdf2f8;color:#be185d;border:1px solid #fbcfe8}
+.u-tags{display:flex;flex-wrap:wrap;gap:5px}
+.u-tag{font-size:11px;padding:1px 8px;border-radius:99px;background:#f3f4f6;color:var(--text-2);border:1px solid var(--border)}
+.u-tag.domain{background:var(--primary-soft);color:var(--primary);border-color:#c7d2fe}
+.u-source{font-size:12px;color:var(--text-2);background:#f9fafb;border-left:3px solid var(--border-2);padding:5px 10px;border-radius:0 6px 6px 0}
+.u-points{list-style:none;font-size:12.8px;display:flex;flex-direction:column;gap:4px}
+.u-points li{padding-left:14px;position:relative}
+.u-points li::before{content:"";position:absolute;left:2px;top:9px;width:5px;height:5px;border-radius:50%;background:var(--primary)}
+.u-mis{background:var(--red-soft);border:1px solid #fecaca;border-radius:8px;padding:8px 12px;font-size:12.5px;color:#991b1b}
+.u-mis .t{font-weight:600;margin-bottom:2px}
+.kb-empty{grid-column:1/-1;text-align:center;color:var(--text-2);padding:50px 0}
+
+/* ---------- 运行记录页 ---------- */
+.runs-table{width:100%;border-collapse:collapse;font-size:13px}
+.runs-table th,.runs-table td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--border)}
+.runs-table th{font-size:12px;color:var(--text-2);font-weight:600;background:#f9fafb}
+.runs-table tbody tr{cursor:pointer}
+.runs-table tbody tr:hover{background:var(--primary-soft)}
+.status-badge{font-size:11.5px;padding:2px 9px;border-radius:99px;font-weight:500}
+.st-completed{background:var(--green-soft);color:var(--green)}
+.st-awaiting_human,.st-running,.st-created{background:var(--amber-soft);color:var(--amber)}
+.st-failed{background:var(--red-soft);color:var(--red)}
+.runs-empty{text-align:center;color:var(--text-2);padding:40px 0}
+#run-detail{margin-top:16px}
+#run-detail .md-paper{max-height:560px}
+
+/* ---------- 连接失败横幅 ---------- */
+#api-banner{
+  display:none;background:var(--red-soft);border:1px solid #fecaca;color:#991b1b;
+  padding:9px 16px;font-size:13px;border-radius:8px;margin-bottom:14px;
+  align-items:center;gap:10px;flex-wrap:wrap;
+}
+#api-banner input{padding:4px 8px;border:1px solid #fecaca;border-radius:6px;font-size:12.5px;width:220px;background:#fff}
+#api-banner .btn-sm{padding:3px 10px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo">管</div>
+    <div>
+      <div class="title">管理学知识库 Agent</div>
+      <div class="subtitle">课程设计生成器 · Web 工作台</div>
+    </div>
+  </div>
+  <div id="conn-pill" class="pill"><span class="dot"></span><span id="conn-text">连接中…</span></div>
+</header>
+
+<div class="layout">
+  <nav class="sidebar">
+    <button class="nav-item active" data-tab="design">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h6"/></svg>
+      课程设计
+    </button>
+    <button class="nav-item" data-tab="kb">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      知识库
+    </button>
+    <button class="nav-item" data-tab="runs">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      运行记录
+    </button>
+    <div class="sidebar-foot">P2 · 工作台 v0.2</div>
+  </nav>
+
+  <main>
+    <div id="api-banner">
+      <span>⚠ 无法连接 API 服务</span>
+      <input id="api-base-input" placeholder="http://127.0.0.1:8000" value="http://127.0.0.1:8000">
+      <button class="btn btn-sm" id="api-base-save">连接</button>
+      <span style="font-size:12px">请先在 backend 目录启动：uvicorn app.api.main:app</span>
+    </div>
+
+    <!-- ============ Tab 1：课程设计 ============ -->
+    <section id="tab-design" class="tab active">
+      <div class="design-grid">
+        <form id="need-form" class="card form-card">
+          <h2>需求诊断单 <span class="tag">七要素</span></h2>
+          <label>培训对象
+            <input id="f-audience" required placeholder="如：新任经理（晋升 6 个月内）">
+          </label>
+          <div class="form-row">
+            <label>当前层级
+              <select id="f-level">
+                <option value="1">L1 自我管理</option>
+                <option value="2" selected>L2 带团队</option>
+                <option value="3">L3 带部门</option>
+                <option value="4">L4 带业务线</option>
+                <option value="5">L5 高管</option>
+              </select>
+            </label>
+            <label>人数
+              <input id="f-headcount" type="number" value="24" min="1" max="500">
+            </label>
+          </div>
+          <label>总时长（分钟，15 的倍数最佳）
+            <input id="f-duration" type="number" value="360" min="30" step="15">
+            <div class="chips">
+              <button type="button" class="chip" data-min="90">1.5 小时</button>
+              <button type="button" class="chip" data-min="120">半天</button>
+              <button type="button" class="chip" data-min="180">3 小时</button>
+              <button type="button" class="chip" data-min="360">1 天</button>
+              <button type="button" class="chip" data-min="720">2 天</button>
+            </div>
+          </label>
+          <div class="form-row">
+            <label>行业
+              <select id="f-industry">
+                <option>互联网</option><option>制造</option><option>零售</option>
+                <option>金融</option><option>医药</option><option>教育</option><option>通用</option>
+              </select>
+            </label>
+            <label>主题倾向
+              <select id="f-theme">
+                <option value="">自动识别</option>
+                <option value="新任管理者转型">新任管理者转型</option>
+                <option value="战略共识与解码">战略共识与解码</option>
+              </select>
+            </label>
+          </div>
+          <label>业务痛点（越具体，检索越准）
+            <textarea id="f-pain" rows="3" placeholder="如：新经理仍埋头做事，下属得不到成长，跨部门协作全部卡在经理这里"></textarea>
+          </label>
+          <label>期望的行为改变
+            <textarea id="f-desired" rows="2" placeholder="如：会授权、会给反馈、坚持 1on1"></textarea>
+          </label>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="btn-generate">生成课程包</button>
+            <button type="button" class="btn" id="btn-demo-fill">填入示例需求</button>
+          </div>
+        </form>
+
+        <div class="result-area">
+          <div id="res-empty" class="card empty-hint">
+            <div class="big">填写左侧需求诊断单，生成完整课程包</div>
+            <p>输出：能力差距映射 · 布鲁姆学习目标 · 15 分钟粒度模块大纲 · 理论要点（带引用）· 70-20-10 教学活动 · 评估题与评分量规</p>
+            <p style="margin-top:8px">四道质量门禁自动把关：G1 建设性对齐 / G2 强制溯源 / G3 70-20-10 配比 / G4 认知冲突</p>
+          </div>
+
+          <div id="res-running" class="card hidden">
+            <div class="running-head"><span class="spinner"></span><span id="running-text">流水线执行中…</span><span class="run-id" id="run-id-label"></span></div>
+            <ol class="stepper" id="stepper"></ol>
+            <div class="running-note">当前模式：<b id="running-llm">-</b>。Mock 模式秒级完成；GLM-5 在线模式单轮约 12–14 分钟，请耐心等待。</div>
+          </div>
+
+          <div id="res-human" class="card hidden">
+            <div class="human-head">⚠ 人工审核点</div>
+            <div class="human-sub" id="human-sub"></div>
+            <div class="human-body" id="human-body"></div>
+            <textarea id="feedback" class="hidden" rows="3" placeholder="请描述需要修正的问题（将作为质量门禁/模块规划的修正反馈）"></textarea>
+            <div class="human-actions">
+              <button class="btn btn-primary" id="btn-approve">✓ 批准，继续</button>
+              <button class="btn btn-danger" id="btn-revise">↩ 打回修改</button>
+            </div>
+          </div>
+
+          <div id="res-done" class="card hidden">
+            <div class="done-head">
+              <h3>✓ 课程包已生成</h3>
+              <div>
+                <button class="btn btn-sm" id="btn-again">重新生成</button>
+                <button class="btn btn-sm btn-primary" id="btn-download">下载 Markdown</button>
+              </div>
+            </div>
+            <div class="stat-row" id="done-stats"></div>
+            <div class="gate-row" id="done-gates"></div>
+            <div class="md-paper" id="md-view"></div>
+          </div>
+
+          <div id="res-failed" class="card hidden">
+            <h3 style="color:var(--red);margin-bottom:8px">✗ 流水线失败</h3>
+            <div id="failed-detail" style="font-size:13px;color:var(--text-2);white-space:pre-wrap"></div>
+            <div style="margin-top:12px"><button class="btn btn-sm" id="btn-retry">重试</button></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Tab 2：知识库 ============ -->
+    <section id="tab-kb" class="tab">
+      <div class="card kb-bar">
+        <input id="kb-q" placeholder="搜索知识单元：授权、GROW、战略共识、五力…">
+        <select id="kb-domain">
+          <option value="">全部领域</option>
+        </select>
+        <select id="kb-evidence">
+          <option value="">全部证据等级</option>
+          <option value="A">A · 实证强支持</option>
+          <option value="B">B · 情境依赖</option>
+          <option value="C">C · 经验争议</option>
+        </select>
+        <span class="kb-count" id="kb-count"></span>
+      </div>
+      <div id="kb-grid" class="kb-grid"></div>
+    </section>
+
+    <!-- ============ Tab 3：运行记录 ============ -->
+    <section id="tab-runs" class="tab">
+      <div class="card">
+        <table class="runs-table">
+          <thead><tr>
+            <th>运行编号</th><th>状态</th><th>培训对象</th><th>时长</th><th>行业</th><th>模块数</th><th>更新时间</th><th></th>
+          </tr></thead>
+          <tbody id="runs-body"></tbody>
+        </table>
+        <div id="runs-empty" class="runs-empty hidden">暂无运行记录，先去「课程设计」生成一份课程包</div>
+      </div>
+      <div id="run-detail" class="card hidden">
+        <div class="done-head">
+          <h3 id="run-detail-title" style="font-size:14.5px"></h3>
+          <button class="btn btn-sm" id="btn-close-detail">收起</button>
+        </div>
+        <div class="md-paper" id="run-detail-md"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+"use strict";
+
+/* ==================== 基础 ==================== */
+const $ = (id) => document.getElementById(id);
+
+// API 基址：同源优先；独立打开（file:// 或预览面板）时回落本地服务，可用横幅修改
+const SAME_ORIGIN = location.protocol !== "file:" && location.port !== "";
+let API_BASE = localStorage.getItem("mgmt_api_base") || (SAME_ORIGIN ? "" : "http://127.0.0.1:8000");
+
+async function api(path, opts = {}) {
+  const r = await fetch(API_BASE + path, opts);
+  if (!r.ok) {
+    let msg = r.status + " " + r.statusText;
+    try { const j = await r.json(); msg = j.detail || msg; } catch (_) {}
+    throw new Error(msg);
+  }
+  return r;
+}
+
+function show(panelId) {
+  for (const id of ["res-empty", "res-running", "res-human", "res-done", "res-failed"]) {
+    $(id).classList.toggle("hidden", id !== panelId);
+  }
+}
+
+/* ==================== 顶栏连接状态 ==================== */
+async function refreshConn() {
+  const pill = $("conn-pill"), text = $("conn-text");
+  try {
+    const j = await (await api("/healthz")).json();
+    pill.className = "pill ok";
+    text.textContent = `已连接 · LLM=${j.llm} · 知识单元 ${j.knowledge_units}`;
+    $("api-banner").style.display = "none";
+    return j;
+  } catch (e) {
+    pill.className = "pill bad";
+    text.textContent = "API 未连接";
+    $("api-banner").style.display = "flex";
+    return null;
+  }
+}
+
+$("api-base-save").onclick = () => {
+  API_BASE = $("api-base-input").value.trim().replace(/\/$/, "");
+  localStorage.setItem("mgmt_api_base", API_BASE);
+  refreshConn();
+};
+
+/* ==================== Tab 切换 ==================== */
+document.querySelectorAll(".nav-item").forEach((btn) => {
+  btn.onclick = () => {
+    document.querySelectorAll(".nav-item").forEach((b) => b.classList.remove("active"));
+    document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+    btn.classList.add("active");
+    $("tab-" + btn.dataset.tab).classList.add("active");
+    if (btn.dataset.tab === "kb") loadKb();
+    if (btn.dataset.tab === "runs") loadRuns();
+  };
+});
+
+/* ==================== Markdown 渲染（课程包） ==================== */
+function esc(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function inline(s) {
+  return esc(s)
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/`([^`]+)`/g, "<code>$1</code>");
+}
+function renderMarkdown(md) {
+  const lines = md.split(/\r?\n/);
+  const out = [];
+  let para = [];
+  const flushPara = () => {
+    if (para.length) { out.push("<p>" + para.map(inline).join("<br>") + "</p>"); para = []; }
+  };
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    // 表格
+    if (/^\s*\|.*\|\s*$/.test(line)) {
+      flushPara();
+      const rows = [];
+      while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) {
+        rows.push(lines[i].trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim()));
+        i++;
+      }
+      const body = rows.filter((r) => !r.every((c) => /^:?-{2,}:?$/.test(c)));
+      if (body.length) {
+        let t = "<table><thead><tr>" + body[0].map((c) => "<th>" + inline(c) + "</th>").join("") + "</tr></thead><tbody>";
+        for (const r of body.slice(1)) t += "<tr>" + r.map((c) => "<td>" + inline(c) + "</td>").join("") + "</tr>";
+        out.push(t + "</tbody></table>");
+      }
+      continue;
+    }
+    // 标题
+    let m = line.match(/^(#{1,4})\s+(.*)$/);
+    if (m) { flushPara(); const lv = m[1].length; out.push(`<h${lv}>${inline(m[2])}</h${lv}>`); i++; continue; }
+    // 分隔线
+    if (/^\s*-{3,}\s*$/.test(line)) { flushPara(); out.push("<hr>"); i++; continue; }
+    // 引用
+    if (/^>\s?/.test(line)) {
+      flushPara();
+      const q = [];
+      while (i < lines.length && /^>\s?/.test(lines[i])) { q.push(lines[i].replace(/^>\s?/, "")); i++; }
+      out.push("<blockquote>" + q.map(inline).join("<br>") + "</blockquote>");
+      continue;
+    }
+    // 列表（支持一层嵌套）
+    if (/^(\s*)(?:[-*]|\d+\.)\s+/.test(line)) {
+      flushPara();
+      const items = [];
+      while (i < lines.length) {
+        const lm = lines[i].match(/^(\s*)(?:[-*]|\d+\.)\s+(.*)$/);
+        if (lm) { items.push({ indent: lm[1].length, text: lm[2] }); i++; continue; }
+        if (!lines[i].trim() && i + 1 < lines.length && /^(\s*)(?:[-*]|\d+\.)\s+/.test(lines[i + 1])) { i++; continue; }
+        break;
+      }
+      let html = "", cur = -1, openLi = false;
+      const closeLi = () => { if (openLi) { html += "</li>"; openLi = false; } };
+      for (const it of items) {
+        const lv = it.indent >= 2 ? 1 : 0;
+        if (lv > cur) { closeLi(); html += "<ul>"; cur = lv; }
+        else if (lv < cur) { closeLi(); html += "</ul>"; cur = lv; }
+        else closeLi();
+        html += "<li>" + inline(it.text);
+        openLi = true;
+      }
+      closeLi();
+      while (cur-- >= 0) html += "</ul>";
+      out.push(html);
+      continue;
+    }
+    if (!line.trim()) { flushPara(); i++; continue; }
+    para.push(line);
+    i++;
+  }
+  flushPara();
+  return out.join("\n");
+}
+
+/* ==================== 课程设计：状态机 ==================== */
+const STAGES = [
+  "需求解析", "能力差距分析", "学习目标生成", "模块规划",
+  "内容匹配检索", "教学活动编排", "评估设计", "质量门禁", "打包输出",
+];
+const STAGE_MAP = {
+  need_parsed: 1, gap_confirmed: 2, objectives_generated: 3, modules_planned: 4,
+  content_matched: 5, activities_designed: 6, assessments_designed: 7,
+  retrying: 4, gates_passed: 8, gates_passed_forced: 8, completed: 9,
+};
+
+let pollTimer = null;
+let currentRun = null;
+let lastMd = "";
+
+function renderStepper(statusField) {
+  const idx = STAGE_MAP[statusField] || 0;
+  $("stepper").innerHTML = STAGES.map((s, n) => {
+    const cls = n < idx ? "done" : n === idx ? "current" : "";
+    const mark = n < idx ? "✓" : n + 1;
+    return `<li class="${cls}"><span class="node">${mark}</span><span class="label">${esc(s)}</span></li>`;
+  }).join("");
+}
+
+async function pollRun(runId) {
+  try {
+    const j = await (await api("/api/v1/runs/" + encodeURIComponent(runId))).json();
+    currentRun = j;
+    if (j.status === "completed") {
+      stopPoll();
+      await showDone(runId);
+    } else if (j.status === "awaiting_human") {
+      stopPoll();
+      showHuman(j.interrupt);
+    } else if (j.status === "failed") {
+      stopPoll();
+      showFailed(j.detail);
+    } else {
+      $("running-text").textContent = "流水线执行中…";
+      renderStepper((j.detail || {}).status_field);
+    }
+  } catch (e) {
+    stopPoll();
+    showFailed({ error: String(e) });
+  }
+}
+
+function startPoll(runId) {
+  stopPoll();
+  $("run-id-label").textContent = runId;
+  renderStepper(null);
+  show("res-running");
+  pollTimer = setInterval(() => pollRun(runId), 1500);
+  pollRun(runId);
+}
+function stopPoll() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+
+function showHuman(interrupt) {
+  show("res-human");
+  const type = (interrupt || {}).type || "human_review";
+  const payload = (interrupt || {}).payload || {};
+  if (type === "confirm_targets") {
+    $("human-sub").textContent = "系统已从业务痛点识别出能力差距目标，请确认后进入后续设计（能力目标选错，全盘皆错）。";
+    const rows = (payload.targets || []).map((t) =>
+      `<tr><td>${esc(t.domain || "")}</td><td style="text-align:center">L${esc(String(t.target_level ?? ""))}</td><td>${esc(t.gap || "")}</td><td>${esc(t.rationale || "")}</td></tr>`).join("");
+    $("human-body").innerHTML =
+      (payload.summary ? `<p style="font-size:13px;color:var(--text-2);margin-bottom:8px">${esc(payload.summary)}</p>` : "") +
+      `<table><thead><tr><th>胜任力域</th><th>目标层级</th><th>差距描述</th><th>判定依据</th></tr></thead><tbody>${rows}</tbody></table>`;
+    $("feedback").classList.add("hidden");
+    $("btn-revise").classList.add("hidden");
+  } else {
+    $("human-sub").textContent = "质量门禁多次自动重试仍未通过，转人工签发。可批准放行，或打回带反馈重新规划（最多两轮人工修订）。";
+    const issues = (payload.issues || []).map((x) => `<li>${esc(String(x))}</li>`).join("");
+    $("human-body").innerHTML = `<ul class="issue-list">${issues}</ul>`;
+    $("feedback").classList.remove("hidden");
+    $("btn-revise").classList.remove("hidden");
+  }
+}
+
+async function showDone(runId) {
+  const md = await (await api("/api/v1/runs/" + encodeURIComponent(runId) + "/package.md")).text();
+  lastMd = md;
+  const pkg = (currentRun && currentRun.detail) || {};
+  // 计数优先取流水线 detail；markdown 头部解析仅作兜底
+  const pick = (key, label) => {
+    const v = pkg[key];
+    if (typeof v === "number" && v > 0) return v;
+    const m = md.match(new RegExp("^- " + label + "[数]?[：:]\\s*(\\d+)", "m"));
+    return m ? m[1] : "-";
+  };
+  const all = [pick("modules_count", "模块"), pick("activities_count", "活动"),
+               pick("assessments_count", "评估题"), pick("citations_count", "引用")];
+  $("done-stats").innerHTML = ["模块", "活动", "评估题", "引用"].map((l, n) =>
+    `<div class="stat"><div class="num">${esc(String(all[n]))}</div><div class="lbl">${l}</div></div>`).join("");
+  const gates = (pkg.gates || []).map((g) =>
+    `<span class="gate-badge ${g.passed ? "" : "fail"}">${g.passed ? "✓" : "✗"} ${esc(g.gate || "")}</span>`).join("");
+  $("done-gates").innerHTML = gates || '<span style="font-size:12.5px;color:var(--text-3)">门禁报告见课程包</span>';
+  $("md-view").innerHTML = renderMarkdown(md);
+  show("res-done");
+}
+
+function showFailed(detail) {
+  show("res-failed");
+  const err = (detail && (detail.error || JSON.stringify(detail, null, 2))) || "未知错误";
+  $("failed-detail").textContent = err;
+}
+
+/* ==================== 表单 ==================== */
+$("btn-demo-fill").onclick = () => {
+  $("f-audience").value = "新任经理（晋升 6 个月内）";
+  $("f-level").value = "2";
+  $("f-headcount").value = "24";
+  $("f-duration").value = "360";
+  $("f-industry").value = "互联网";
+  $("f-theme").value = "新任管理者转型";
+  $("f-pain").value = "新经理仍埋头做事，下属得不到成长，跨部门协作全部卡在经理这里";
+  $("f-desired").value = "完成从个人贡献者到团队领导者的转身：会授权、会给反馈、坚持 1on1";
+};
+
+document.querySelectorAll(".chip[data-min]").forEach((c) => {
+  c.onclick = () => { $("f-duration").value = c.dataset.min; };
+});
+
+$("need-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const need = {
+    audience: $("f-audience").value.trim(),
+    audience_level: parseInt($("f-level").value, 10),
+    headcount: parseInt($("f-headcount").value, 10) || 20,
+    duration_minutes: parseInt($("f-duration").value, 10) || 120,
+    business_pain: $("f-pain").value.trim(),
+    desired_behavior: $("f-desired").value.trim(),
+    industry: $("f-industry").value,
+    theme_hint: $("f-theme").value || null,
+  };
+  if (!need.business_pain) { alert("请填写业务痛点——它是能力差距识别与知识检索的核心输入"); return; }
+  $("btn-generate").disabled = true;
+  $("btn-generate").textContent = "提交中…";
+  try {
+    const j = await (await api("/api/v1/runs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(need),
+    })).json();
+    currentRun = j;
+    const llm = (await refreshConn() || {}).llm || "";
+    $("running-llm").textContent = llm;
+    if (j.status === "awaiting_human") showHuman(j.interrupt);
+    else if (j.status === "failed") showFailed(j.detail);
+    else if (j.status === "completed") await showDone(j.run_id);
+    else startPoll(j.run_id);
+  } catch (err) {
+    showFailed({ error: String(err) });
+  } finally {
+    $("btn-generate").disabled = false;
+    $("btn-generate").textContent = "生成课程包";
+  }
+};
+
+$("btn-approve").onclick = async () => {
+  if (!currentRun) return;
+  $("btn-approve").disabled = true;
+  try {
+    const j = await (await api(`/api/v1/runs/${encodeURIComponent(currentRun.run_id)}/resume`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision: { action: "approve" } }),
+    })).json();
+    currentRun = j;
+    if (j.status === "completed") await showDone(j.run_id);
+    else if (j.status === "awaiting_human") showHuman(j.interrupt);
+    else if (j.status === "failed") showFailed(j.detail);
+    else startPoll(j.run_id);
+  } catch (e) { showFailed({ error: String(e) }); }
+  finally { $("btn-approve").disabled = false; }
+};
+
+$("btn-revise").onclick = async () => {
+  if (!currentRun) return;
+  const feedback = $("feedback").value.trim();
+  if (!feedback) { $("feedback").focus(); $("feedback").style.borderColor = "var(--red)"; return; }
+  $("btn-revise").disabled = true;
+  try {
+    const j = await (await api(`/api/v1/runs/${encodeURIComponent(currentRun.run_id)}/resume`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision: { action: "revise", feedback } }),
+    })).json();
+    currentRun = j;
+    if (j.status === "awaiting_human") showHuman(j.interrupt);
+    else startPoll(j.run_id);
+  } catch (e) { showFailed({ error: String(e) }); }
+  finally { $("btn-revise").disabled = false; }
+};
+
+$("btn-download").onclick = () => {
+  const blob = new Blob([lastMd], { type: "text/markdown;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = (currentRun ? currentRun.run_id : "course-package") + ".md";
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+$("btn-again").onclick = () => show("res-empty");
+$("btn-retry").onclick = () => show("res-empty");
+
+/* ==================== 知识库 ==================== */
+const DOMAIN_NAMES = {
+  STRAT: "战略思维", TEAM: "团队领导", CHANGE: "变革管理",
+  COMM: "沟通影响", COACH: "教练辅导", EXEC: "执行落地",
+};
+
+async function loadKb() {
+  const domainSel = $("kb-domain");
+  if (domainSel.options.length <= 1) {
+    for (const [code, name] of Object.entries(DOMAIN_NAMES)) {
+      const o = document.createElement("option");
+      o.value = code; o.textContent = name;
+      domainSel.appendChild(o);
+    }
+  }
+  const q = $("kb-q").value.trim();
+  const domain = domainSel.value;
+  const evidence = $("kb-evidence").value;
+  const params = new URLSearchParams();
+  if (q) params.set("q", q);
+  if (domain) params.set("domain", domain);
+  let units = await (await api("/api/v1/kb/units?" + params.toString())).json();
+  if (evidence) units = units.filter((u) => u.evidence_level === evidence);
+  $("kb-count").textContent = `共 ${units.length} 个知识单元`;
+  if (!units.length) {
+    $("kb-grid").innerHTML = '<div class="kb-empty">没有匹配的知识单元——P0 仅覆盖「新任管理者转型」「战略共识与解码」两个主题</div>';
+    return;
+  }
+  const evName = { A: "A · 实证强支持", B: "B · 情境依赖", C: "C · 经验争议" };
+  $("kb-grid").innerHTML = units.map((u) => `
+    <div class="unit-card">
+      <div class="u-head">
+        <div class="u-title">${esc(u.title)}</div>
+        <span class="u-id">${esc(u.id)}</span>
+      </div>
+      <div class="u-tags">
+        <span class="badge badge-${(u.evidence_level || "B").toLowerCase()}">${evName[u.evidence_level] || u.evidence_level}</span>
+        ${u.contested ? '<span class="badge badge-contested">⚔ 学派争议</span>' : ""}
+        ${(u.domains || []).map((d) => `<span class="u-tag domain">${esc(DOMAIN_NAMES[d] || d)}</span>`).join("")}
+        ${(u.dilemmas || []).map((d) => `<span class="u-tag">${esc(d)}</span>`).join("")}
+      </div>
+      <div class="u-source">📖 ${esc(u.source)}</div>
+      <ul class="u-points">${(u.key_points || []).map((p) => `<li>${esc(p)}</li>`).join("")}</ul>
+      ${(u.misconceptions || []).length ? `<div class="u-mis"><div class="t">⚠ 学员常见误区</div>${u.misconceptions.map((m) => `<div>${esc(m)}</div>`).join("")}</div>` : ""}
+    </div>`).join("");
+}
+
+let kbTimer = null;
+$("kb-q").addEventListener("input", () => { clearTimeout(kbTimer); kbTimer = setTimeout(loadKb, 300); });
+$("kb-domain").onchange = loadKb;
+$("kb-evidence").onchange = loadKb;
+
+/* ==================== 运行记录 ==================== */
+async function loadRuns() {
+  let runs = [];
+  try { runs = await (await api("/api/v1/runs")).json(); } catch (_) { runs = []; }
+  $("runs-empty").classList.toggle("hidden", runs.length > 0);
+  $("runs-body").innerHTML = runs.map((r) => `
+    <tr data-run="${esc(r.run_id)}">
+      <td style="font-family:ui-monospace,Consolas,monospace;font-size:12px">${esc(r.run_id)}</td>
+      <td><span class="status-badge st-${esc(r.status || "")}">${esc(r.status || "")}</span></td>
+      <td>${esc(r.audience || "-")}</td>
+      <td>${r.duration_minutes ? esc(String(Math.round(r.duration_minutes / 60 * 10) / 10)) + " 小时" : "-"}</td>
+      <td>${esc(r.industry || "-")}</td>
+      <td style="text-align:center">${r.modules ?? "-"}</td>
+      <td style="font-size:12px;color:var(--text-2)">${esc((r.updated_at || "").replace("T", " ").slice(0, 19))}</td>
+      <td>${r.has_package ? '<button class="btn btn-sm">查看</button>' : ""}</td>
+    </tr>`).join("");
+  document.querySelectorAll("#runs-body tr[data-run]").forEach((tr) => {
+    tr.onclick = async () => {
+      const runId = tr.dataset.run;
+      try {
+        const md = await (await api("/api/v1/runs/" + encodeURIComponent(runId) + "/package.md")).text();
+        $("run-detail-title").textContent = runId;
+        $("run-detail-md").innerHTML = renderMarkdown(md);
+        $("run-detail").classList.remove("hidden");
+        $("run-detail").scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (e) { alert("课程包不存在或尚未生成"); }
+    };
+  });
+}
+$("btn-close-detail").onclick = () => $("run-detail").classList.add("hidden");
+
+/* ==================== 启动 ==================== */
+refreshConn();
+</script>
+</body>
+</html>

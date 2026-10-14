@@ -1,0 +1,8 @@
+# 管理学知识库 Agent · 后端依赖（Python 3.11+）
+# 安装：python -m venv .venv && .venv/bin/pip install -r requirements.txt
+langgraph>=1.0          # 状态机编排（九节点 + 人工审核中断 + 检查点）
+fastapi>=0.110          # API 服务
+uvicorn[standard]>=0.29 # ASGI 服务器
+pydantic>=2.6           # 领域模型与校验
+httpx>=0.27             # DeepSeek 适配器（OpenAI 兼容协议）/ TestClient
+pytest>=8.0             # 测试
