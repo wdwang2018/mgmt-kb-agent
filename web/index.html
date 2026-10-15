@@ -82,6 +82,17 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .btn-sm{padding:4px 10px;font-size:12.5px}
 .hidden{display:none !important}
+.kbpipe-grid{display:grid;grid-template-columns:400px 1fr;gap:18px;align-items:start}
+@media(max-width:960px){.kbpipe-grid{grid-template-columns:1fr}}
+.nav-badge{background:var(--red);color:#fff;font-size:10.5px;line-height:1;padding:3px 6px;border-radius:99px;margin-left:auto}
+.form-tip{font-size:12.5px;color:var(--text-2);margin:-4px 0 10px;line-height:1.6}
+.ku-meta{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+.ku-chip{font-size:11.5px;background:var(--primary-soft);color:var(--primary);padding:2px 8px;border-radius:99px}
+.kcheck{display:flex;align-items:center;gap:8px;font-size:12.8px;padding:5px 0;border-bottom:1px dashed var(--border)}
+.kcheck:last-child{border-bottom:none}
+.kcheck .ok{color:var(--green);font-weight:700}
+.kcheck .bad{color:var(--red);font-weight:700}
+.kcheck .kdetail{color:var(--text-2);font-size:12px}
 
 /* ---------- 课程设计页 ---------- */
 .design-grid{display:grid;grid-template-columns:400px 1fr;gap:18px;align-items:start}
@@ -273,7 +284,12 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
       运行记录
     </button>
-    <div class="sidebar-foot">P2 · 工作台 v0.2</div>
+    <button class="nav-item" data-tab="kbpipe">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h7l2 3h7v13H4z"/><path d="M9 12h6M9 16h6"/></svg>
+      知识流水线
+      <span class="nav-badge hidden" id="kbpipe-badge">0</span>
+    </button>
+    <div class="sidebar-foot">P1 · 工作台 v0.3</div>
   </nav>
 
   <main>
@@ -426,6 +442,97 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
         <div class="md-paper" id="run-detail-md"></div>
       </div>
     </section>
+    <!-- ============ Tab 4：知识流水线（P1） ============ -->
+    <section id="tab-kbpipe" class="tab">
+      <div class="kbpipe-grid">
+        <form id="corpus-form" class="card form-card">
+          <h2>语料采集 <span class="tag">L1 层</span></h2>
+          <p class="form-tip">提交带页码定位的语料片段（授权摘要/要点化转述，不整文复制），流水线自动加工为知识单元草稿并质检。</p>
+          <div class="form-row">
+            <label>书名
+              <input id="c-book" required placeholder="如：领导梯队（The Leadership Pipeline）">
+            </label>
+            <label>作者
+              <input id="c-author" required placeholder="如：Robert Stephen Smith">
+            </label>
+          </div>
+          <div class="form-row">
+            <label>年份
+              <input id="c-year" type="number" placeholder="如：2001" min="1900" max="2100">
+            </label>
+            <label>定位（章节/页码）
+              <input id="c-locator" required placeholder="如：第3章">
+            </label>
+          </div>
+          <label>版权状态
+            <select id="c-copyright">
+              <option>要点化</option><option>公版</option><option>授权</option><option>原创</option>
+            </select>
+          </label>
+          <label>语料正文（要点化摘要）
+            <textarea id="c-text" rows="7" required placeholder="粘贴或转写语料片段，保留观点、证据与情境边界"></textarea>
+          </label>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="btn-ingest">提交语料并加工</button>
+          </div>
+        </form>
+
+        <div class="result-area">
+          <div id="kb-empty" class="card empty-hint">
+            <div class="big">采集语料，加工为可审核的知识单元</div>
+            <p>流水线：采集落 L1 → 规则/LLM 抽取草稿 → K1-K5 质检 → 人工审核 → 分配正式编号入库</p>
+            <p style="margin-top:8px">质检门禁：K1 溯源完整 / K2 代码合法 / K3 要点化 / K4 误区结构 / K5 唯一性</p>
+          </div>
+
+          <div id="kb-running" class="card hidden">
+            <div class="running-head"><span class="spinner"></span><span>知识流水线执行中…</span><span class="run-id" id="kb-run-id-label"></span></div>
+            <ol class="stepper" id="kb-stepper"></ol>
+          </div>
+
+          <div id="kb-review" class="card hidden">
+            <div class="human-head">草稿待审核</div>
+            <div class="human-sub" id="kb-review-sub"></div>
+            <div class="human-body" id="kb-review-body"></div>
+            <textarea id="kb-note" rows="2" placeholder="审核意见（打回时说明修改要求；批准可留空）"></textarea>
+            <div class="human-actions">
+              <button class="btn btn-primary" id="kb-btn-approve">✓ 批准入库</button>
+              <button class="btn btn-danger" id="kb-btn-reject">↩ 打回</button>
+            </div>
+          </div>
+
+          <div id="kb-done" class="card hidden">
+            <div class="done-head">
+              <h3 id="kb-done-title" style="font-size:14.5px"></h3>
+              <button class="btn btn-sm" id="kb-btn-again">再采一条</button>
+            </div>
+            <div class="md-paper" id="kb-done-md"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="done-head">
+          <h3 style="font-size:14.5px">草稿审核台账 <span class="kb-count" id="kbpipe-count"></span></h3>
+          <button class="btn btn-sm" id="kbpipe-refresh">刷新</button>
+        </div>
+        <table class="runs-table">
+          <thead><tr>
+            <th>草稿编号</th><th>状态</th><th>标题</th><th>来源</th><th>质检</th><th>入库编号</th><th>更新时间</th>
+          </tr></thead>
+          <tbody id="kbpipe-body"></tbody>
+        </table>
+        <div id="kbpipe-empty" class="runs-empty hidden">暂无草稿记录，先在左侧提交一条语料</div>
+      </div>
+
+      <div class="card">
+        <div class="done-head"><h3 style="font-size:14.5px">L1 语料层 <span class="kb-count" id="corpus-count"></span></h3></div>
+        <table class="runs-table">
+          <thead><tr><th>编号</th><th>来源</th><th>定位</th><th>版权状态</th><th>状态</th><th>摘要</th></tr></thead>
+          <tbody id="corpus-body"></tbody>
+        </table>
+        <div id="corpus-empty" class="runs-empty hidden">语料层为空，提交第一条语料</div>
+      </div>
+    </section>
   </main>
 </div>
 
@@ -487,8 +594,168 @@ document.querySelectorAll(".nav-item").forEach((btn) => {
     $("tab-" + btn.dataset.tab).classList.add("active");
     if (btn.dataset.tab === "kb") loadKb();
     if (btn.dataset.tab === "runs") loadRuns();
+    if (btn.dataset.tab === "kbpipe") loadKbPipe();
   };
 });
+
+/* ==================== Tab 4：知识流水线（P1） ==================== */
+const KB_STEPS = ["ingest_corpus", "extract_draft", "validate_draft", "human_review", "commit_draft"];
+const KB_STEP_NAMES = { ingest_corpus: "采集落 L1", extract_draft: "加工抽取", validate_draft: "K1-K5 质检", human_review: "人工审核", commit_draft: "编号入库" };
+let kbCurrentRun = null;
+
+function showKb(panelId) {
+  for (const id of ["kb-empty", "kb-running", "kb-review", "kb-done"]) {
+    $(id).classList.toggle("hidden", id !== panelId);
+  }
+}
+
+async function loadKbPipe() {
+  const [runs, corpus] = await Promise.all([
+    api("/api/v1/kb/runs").then((r) => r.json()).catch(() => []),
+    api("/api/v1/kb/corpus").then((r) => r.json()).catch(() => []),
+  ]);
+  // 待审核徽标
+  const pending = runs.filter((r) => r.status === "awaiting_human").length;
+  $("kbpipe-badge").textContent = String(pending);
+  $("kbpipe-badge").classList.toggle("hidden", pending === 0);
+  // 草稿台账
+  $("kbpipe-count").textContent = `共 ${runs.length} 条`;
+  $("kbpipe-empty").classList.toggle("hidden", runs.length > 0);
+  $("kbpipe-body").innerHTML = runs.map((r) => {
+    const st = statusPill(r.status);
+    const q = r.quality_passed === null ? "-" : (r.quality_passed ? "✓ 通过" : "✗ 未过");
+    return `<tr><td>${esc(r.draft_id || "-")}</td><td>${st}</td><td>${esc(r.title || "-")}</td>` +
+      `<td>${esc(r.source || "-")}</td><td>${q}</td><td>${esc(r.committed_unit_id || "-")}</td>` +
+      `<td>${esc(r.updated_at || "")}</td></tr>`;
+  }).join("");
+  // 语料层
+  $("corpus-count").textContent = `共 ${corpus.length} 条`;
+  $("corpus-empty").classList.toggle("hidden", corpus.length > 0);
+  $("corpus-body").innerHTML = corpus.map((c) =>
+    `<tr><td>${esc(c.id)}</td><td>${esc(c.author)}《${esc(c.book)}》</td><td>${esc(c.locator)}</td>` +
+    `<td>${esc(c.copyright_status)}</td><td>${esc(c.status)}</td><td>${esc(c.text_preview)}…</td></tr>`).join("");
+}
+
+function statusPill(status) {
+  const map = {
+    awaiting_human: ["待审核", "pill"], committed: ["已入库", "pill ok"],
+    rejected: ["已打回", "pill bad"], failed: ["失败", "pill bad"],
+    validated: ["质检通过", "pill ok"],
+  };
+  const [label, cls] = map[status] || [status || "-", "pill"];
+  return `<span class="${cls}"><span class="dot"></span>${label}</span>`;
+}
+
+$("corpus-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const body = {
+    book: $("c-book").value.trim(),
+    author: $("c-author").value.trim(),
+    year: $("c-year").value ? Number($("c-year").value) : null,
+    locator: $("c-locator").value.trim(),
+    copyright_status: $("c-copyright").value,
+    text: $("c-text").value.trim(),
+  };
+  kbCurrentRun = null;
+  $("kb-run-id-label").textContent = "";
+  $("kb-stepper").innerHTML = KB_STEPS.map((s, i) =>
+    `<li id="kb-step-${i}"><span class="node">${i + 1}</span><span class="label">${KB_STEP_NAMES[s]}</span></li>`).join("");
+  showKb("kb-running");
+  try {
+    const j = await (await api("/api/v1/kb/ingest", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    })).json();
+    kbCurrentRun = j;
+    if (j.status === "failed") {
+      $("kb-done-title").textContent = "✗ 流水线执行失败";
+      $("kb-done-md").innerHTML = `<p>${esc(j.detail?.error || "未知错误")}</p>`;
+      showKb("kb-done");
+      return;
+    }
+    renderKbReview(j);
+    loadKbPipe();
+  } catch (err) {
+    $("kb-done-title").textContent = "✗ 提交失败";
+    $("kb-done-md").innerHTML = `<p>${esc(err.message)}</p>`;
+    showKb("kb-done");
+  }
+};
+
+function renderKbReview(j) {
+  const d = j.draft;
+  if (!d) {
+    $("kb-done-title").textContent = "流水线已结束";
+    $("kb-done-md").innerHTML = "<p>未生成草稿</p>";
+    showKb("kb-done");
+    return;
+  }
+  if (j.status === "rejected") {
+    const failed = (j.quality?.checks || []).filter((c) => !c.passed);
+    $("kb-done-title").textContent = "✗ 质检未通过，已自动打回";
+    $("kb-done-md").innerHTML =
+      `<p>草稿 <b>${esc(d.id)}</b> 未通过质检，未进入人工审核：</p>` +
+      failed.map((c) => `<div class="kcheck"><span class="bad">✗</span><b>${esc(c.code)} ${esc(c.name)}</b><span class="kdetail">${esc(c.detail)}</span></div>`).join("") +
+      `<p style="margin-top:8px;font-size:12.5px;color:var(--text-2)">请补充语料信息或修正后重新提交。</p>`;
+    showKb("kb-done");
+    return;
+  }
+  if (j.status !== "awaiting_human") {
+    $("kb-done-title").textContent = j.status === "committed" ? "✓ 已入库" : "流水线已结束";
+    $("kb-done-md").innerHTML = `<p>${esc(j.committed_unit_id || "")}</p>`;
+    showKb("kb-done");
+    return;
+  }
+  const u = d.unit;
+  $("kb-review-sub").textContent = `草稿 ${d.id} ｜ 语料 ${(d.corpus_ids || []).join(", ")}`;
+  const checks = (d.quality?.checks || []).map((c) =>
+    `<div class="kcheck"><span class="${c.passed ? "ok" : "bad"}">${c.passed ? "✓" : "✗"}</span>` +
+    `<b>${esc(c.code)} ${esc(c.name)}</b><span class="kdetail">${esc(c.detail)}</span></div>`).join("");
+  $("kb-review-body").innerHTML =
+    `<h4 style="margin:4px 0">${esc(u.title)}</h4>` +
+    `<div class="ku-meta"><span class="ku-chip">${esc(u.type)}</span>` +
+    u.domains.map((x) => `<span class="ku-chip">${esc(x)}</span>`).join("") +
+    u.dilemmas.map((x) => `<span class="ku-chip">${esc(x)}</span>`).join("") +
+    `<span class="ku-chip">证据 ${esc(u.evidence_level)}</span></div>` +
+    `<p style="font-size:12.8px;color:var(--text-2)">来源：${esc(u.source.author)}《${esc(u.source.book)}》${esc(u.source.locator)}</p>` +
+    `<p style="font-size:13px;margin:8px 0"><b>要点：</b></p>` +
+    `<ul style="font-size:13px;margin:0 0 8px 18px">${u.key_points.map((p) => `<li>${esc(p)}</li>`).join("")}</ul>` +
+    `<p style="font-size:13px;margin:8px 0 4px"><b>质检明细：</b></p>${checks}`;
+  $("kb-note").value = "";
+  showKb("kb-review");
+}
+
+async function kbDecide(action) {
+  if (!kbCurrentRun) return;
+  const note = $("kb-note").value.trim();
+  try {
+    const j = await (await api(`/api/v1/kb/runs/${kbCurrentRun.run_id}/review`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, note, reviewer: "web-reviewer" }),
+    })).json();
+    if (j.status === "committed") {
+      $("kb-done-title").textContent = `✓ 已批准入库：${j.committed_unit_id}`;
+      $("kb-done-md").innerHTML = `<p>知识单元 <b>${esc(j.committed_unit_id)}</b> 已写入知识库，检索与课程生成立即可用。</p>`;
+    } else if (j.status === "rejected") {
+      $("kb-done-title").textContent = "↩ 已打回";
+      $("kb-done-md").innerHTML = `<p>草稿已标记打回${note ? `，意见：${esc(note)}` : ""}。</p>`;
+    } else {
+      $("kb-done-title").textContent = j.status === "failed" ? "✗ 执行失败" : "流水线已结束";
+      $("kb-done-md").innerHTML = `<p>${esc(j.detail?.error || j.status)}</p>`;
+    }
+    showKb("kb-done");
+    loadKbPipe();
+    refreshConn();
+  } catch (err) {
+    $("kb-done-title").textContent = "✗ 操作失败";
+    $("kb-done-md").innerHTML = `<p>${esc(err.message)}</p>`;
+    showKb("kb-done");
+  }
+}
+
+$("kb-btn-approve").onclick = () => kbDecide("approve");
+$("kb-btn-reject").onclick = () => kbDecide("reject");
+$("kb-btn-again").onclick = () => { showKb("kb-empty"); $("corpus-form").reset(); };
+$("kbpipe-refresh").onclick = loadKbPipe;
 
 /* ==================== Markdown 渲染（课程包） ==================== */
 function esc(s) {
@@ -861,7 +1128,7 @@ async function loadRuns() {
 $("btn-close-detail").onclick = () => $("run-detail").classList.add("hidden");
 
 /* ==================== 启动 ==================== */
-refreshConn();
+refreshConn().then((j) => { if (j) loadKbPipe(); });
 </script>
 </body>
 </html>

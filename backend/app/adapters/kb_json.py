@@ -41,6 +41,7 @@ class JsonKnowledgeStore(KnowledgeStore):
         return cases
 
     def save_unit(self, unit: KnowledgeUnit) -> None:
+        self.units_dir.mkdir(parents=True, exist_ok=True)  # 空知识库环境（测试/首次部署）兜底
         target = self.units_dir / f"{unit.id.split('-')[1].lower()}_draft.jsonl"
         with target.open("a", encoding="utf-8") as f:
             f.write(unit.model_dump_json(exclude_none=True) + "\n")

@@ -101,6 +101,65 @@ class KnowledgeUnit(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# 知识流水线（P1）：L1 语料层 → L2 草稿 → 质检 → 人工审核 → 入库
+# ---------------------------------------------------------------------------
+class CorpusChunk(BaseModel):
+    """L1 语料层：带定位的语料片段，采集产物，溯源链条的起点。"""
+
+    id: str = Field(pattern=r"^CC-\d{4}$", description="语料编号 CC-0001")
+    book: str = Field(description="来源书名")
+    author: str = Field(description="作者")
+    year: Optional[int] = None
+    locator: str = Field(description="定位：章节/页码/小节")
+    copyright_status: Literal["公版", "授权", "要点化", "原创"] = "要点化"
+    text: str = Field(description="语料正文（授权摘要/要点化转述，不整文复制）")
+    ingested_by: str = Field(default="manual", description="采集方式：manual/auto")
+    status: Literal["raw", "extracted"] = Field(default="raw", description="raw=待加工，extracted=已抽成草稿")
+
+
+class QualityCheck(BaseModel):
+    """单项质检结果（K1-K5 之一）。"""
+
+    code: str = Field(description="检查项代码，如 K1")
+    name: str = Field(description="检查项名称")
+    passed: bool
+    detail: str = ""
+
+
+class DraftQualityReport(BaseModel):
+    """草稿质检报告：五项规则门禁，任一不过即打回。"""
+
+    passed: bool
+    checks: list[QualityCheck] = Field(default_factory=list)
+
+    def failed_codes(self) -> list[str]:
+        return [c.code for c in self.checks if not c.passed]
+
+
+class UnitDraft(BaseModel):
+    """加工草稿：从语料抽取、待人工审核的知识单元（未入库不参与检索）。"""
+
+    id: str = Field(pattern=r"^DR-\d{4}$", description="草稿编号 DR-0001")
+    unit: KnowledgeUnit = Field(description="草稿本体（id 为占位，入库时分配正式编号）")
+    corpus_ids: list[str] = Field(default_factory=list, description="来源语料 CC 编号")
+    quality: Optional[DraftQualityReport] = None
+    status: Literal["pending_review", "approved", "rejected", "committed"] = "pending_review"
+    review_note: Optional[str] = None
+    reviewer: str = ""
+    created_at: str = ""
+    updated_at: str = ""
+
+
+class DraftReview(BaseModel):
+    """审核决定：批准（commit 时分配正式 ID 入库）/ 打回（携修改意见）。"""
+
+    draft_id: str
+    action: Literal["approve", "reject"]
+    note: str = ""
+    reviewer: str = "reviewer"
+
+
+# ---------------------------------------------------------------------------
 # 培训需求与能力差距（生成器输入契约）
 # ---------------------------------------------------------------------------
 class TrainingNeed(BaseModel):

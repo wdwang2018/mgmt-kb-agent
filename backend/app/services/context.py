@@ -6,10 +6,13 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from ..adapters.corpus_json import JsonCorpusStore
 from ..adapters.kb_json import JsonKnowledgeStore
 from ..adapters.llm_factory import get_llm
 from ..adapters.retrieval_memory import MemoryRetriever
+from ..graph.knowledge_nodes import KBNodeDeps
 from ..graph.nodes import NodeDeps
+from .kb_pipeline import KnowledgePipeline
 from .pipeline import CourseDesignPipeline
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -18,8 +21,10 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 @dataclass
 class AppContext:
     store: JsonKnowledgeStore
+    corpus_store: JsonCorpusStore
     retriever: MemoryRetriever
     pipeline: CourseDesignPipeline
+    kb_pipeline: KnowledgePipeline
     knowledge_dir: Path
     output_dir: Path
 
@@ -34,6 +39,7 @@ def build_context(knowledge_dir: str | Path | None = None,
     o_dir = Path(output_dir) if output_dir else REPO_ROOT / "runs"
 
     store = JsonKnowledgeStore(k_dir, review_log_dir=o_dir / "reviews")
+    corpus_store = JsonCorpusStore(k_dir)
     units = store.load_units()
     retriever = MemoryRetriever(units)
     deps = NodeDeps(
@@ -45,5 +51,14 @@ def build_context(knowledge_dir: str | Path | None = None,
         hitl_mode=hitl_mode,
     )
     pipeline = CourseDesignPipeline(deps)
-    return AppContext(store=store, retriever=retriever, pipeline=pipeline,
+    kb_deps = KBNodeDeps(
+        llm=deps.llm,
+        store=store,
+        corpus_store=corpus_store,
+        hitl_mode=hitl_mode,
+        auto_approve=False,  # Web 审核台走真实人工挂起；Demo/测试用 run_auto
+    )
+    kb_pipeline = KnowledgePipeline(kb_deps, o_dir)
+    return AppContext(store=store, corpus_store=corpus_store, retriever=retriever,
+                      pipeline=pipeline, kb_pipeline=kb_pipeline,
                       knowledge_dir=k_dir, output_dir=o_dir)

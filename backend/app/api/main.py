@@ -9,6 +9,12 @@
 - GET  /api/v1/runs/{run_id}/package.md 下载课程包 Markdown
 - GET  /api/v1/kb/units                 知识单元检索（域/困境/关键词）
 - GET  /api/v1/archetypes               课程原型列表
+- POST /api/v1/kb/ingest                提交语料，跑知识流水线（P1）
+- GET  /api/v1/kb/runs                  知识流水线运行记录（草稿审核台）
+- GET  /api/v1/kb/runs/{run_id}         草稿详情
+- POST /api/v1/kb/runs/{run_id}/review  审核决定（批准入库/打回）
+- GET  /api/v1/kb/corpus                L1 语料层列表
+- GET  /api/v1/kb/taxonomy              受控代码表（表单下拉数据源）
 - GET  /                               Web 工作台（mgmt-kb-agent/web/ 静态目录）
 """
 
@@ -163,6 +169,79 @@ def archetypes():
              "modules": [{"title": m["title"], "minutes": m["minutes"],
                           "bucket_mix": m["bucket_mix"]} for m in a.modules]}
             for a in ARCHETYPES.values()]
+
+
+# ---------------------------------------------------------------------------
+# 知识流水线（P1）：语料采集 → 加工草稿 → 质检 → 人工审核 → 入库
+# ---------------------------------------------------------------------------
+class CorpusBody(BaseModel):
+    book: str
+    author: str
+    year: int | None = None
+    locator: str
+    copyright_status: str = "要点化"
+    text: str
+
+
+class ReviewBody(BaseModel):
+    action: str  # approve | reject
+    note: str = ""
+    reviewer: str = "reviewer"
+
+
+@app.get("/api/v1/kb/taxonomy")
+def kb_taxonomy():
+    """受控代码表：域/困境/证据等级/版权状态（审核台表单下拉数据源）。"""
+    from ..domain.constants import COMPETENCY_DOMAINS, DILEMMA_INDEX, EVIDENCE_LEVELS
+    return {
+        "domains": [{"code": k, "name": v["name"]} for k, v in COMPETENCY_DOMAINS.items()],
+        "dilemmas": [{"code": k, "name": v} for k, v in DILEMMA_INDEX.items()],
+        "evidence_levels": [{"code": k, "name": v} for k, v in EVIDENCE_LEVELS.items()],
+        "copyright_statuses": ["公版", "授权", "要点化", "原创"],
+    }
+
+
+@app.post("/api/v1/kb/ingest")
+def kb_ingest(body: CorpusBody):
+    """提交一条语料，跑采集→加工→质检；质检通过则挂起等待人工审核。"""
+    from ..domain.models import CorpusChunk
+    c = _ctx()
+    chunk = CorpusChunk(id="CC-0000", **body.model_dump())
+    result = c.kb_pipeline.run(chunk)
+    return result.to_dict()
+
+
+@app.get("/api/v1/kb/runs")
+def kb_runs(limit: int = 50):
+    """知识流水线运行记录（草稿审核台列表）。"""
+    return _ctx().kb_pipeline.list_runs(limit)
+
+
+@app.get("/api/v1/kb/runs/{run_id}")
+def kb_run(run_id: str):
+    result = _ctx().kb_pipeline.get(run_id)
+    if result is None:
+        raise HTTPException(404, f"知识流水线 run {run_id} 不存在")
+    return result.to_dict()
+
+
+@app.post("/api/v1/kb/runs/{run_id}/review")
+def kb_review(run_id: str, body: ReviewBody):
+    """审核决定：批准（分配正式编号入库）/ 打回（携修改意见）。"""
+    if body.action not in ("approve", "reject"):
+        raise HTTPException(422, "action 必须为 approve 或 reject")
+    result = _ctx().kb_pipeline.resume(run_id, body.model_dump())
+    return result.to_dict()
+
+
+@app.get("/api/v1/kb/corpus")
+def kb_corpus():
+    """L1 语料层列表。"""
+    c = _ctx()
+    return [{"id": ch.id, "book": ch.book, "author": ch.author, "year": ch.year,
+             "locator": ch.locator, "copyright_status": ch.copyright_status,
+             "status": ch.status, "text_preview": ch.text[:120]}
+            for ch in c.corpus_store.load_chunks()]
 
 
 # Web 工作台静态挂载：API 路由均注册在前，优先匹配；其余路径回落 web/index.html
