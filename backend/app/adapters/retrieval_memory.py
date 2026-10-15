@@ -33,6 +33,10 @@ def tokenize(text: str) -> list[str]:
 
 class MemoryRetriever(Retriever):
     def __init__(self, units: list[KnowledgeUnit]):
+        self._index(units)
+
+    def _index(self, units: list[KnowledgeUnit]) -> None:
+        """（重）建索引：知识流水线入库后调 reload 即时生效，无需替换引用。"""
         self.units = {u.id: u for u in units}
         self._docs = {u.id: tokenize(self._doc_text(u)) for u in units}
         self._df: Counter = Counter()
@@ -40,6 +44,9 @@ class MemoryRetriever(Retriever):
             for t in set(toks):
                 self._df[t] += 1
         self._avgdl = sum(len(t) for t in self._docs.values()) / max(len(self._docs), 1)
+
+    def reload(self, units: list[KnowledgeUnit]) -> None:
+        self._index(units)
 
     @staticmethod
     def _doc_text(u: KnowledgeUnit) -> str:

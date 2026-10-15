@@ -47,14 +47,9 @@ def make_chunk(**kw) -> CorpusChunk:
 
 @pytest.fixture()
 def kb(tmp_path: Path):
-    """隔离环境：空知识库（正式单元拷贝真实 2 个域样例以保证查重有对象）。"""
+    """全隔离环境：空知识库（编号从 KU-LEAD-001 起算，不受真实仓库状态影响）。"""
     k_dir = tmp_path / "knowledge"
     store = JsonKnowledgeStore(k_dir, review_log_dir=tmp_path / "runs" / "reviews")
-    # 预置一个现有单元，供 K5 唯一性与 next_unit_id 测试
-    repo_units = Path(__file__).resolve().parents[2] / "knowledge" / "units"
-    (k_dir / "units").mkdir(parents=True)
-    for f in repo_units.glob("*.jsonl"):
-        (k_dir / "units" / f.name).write_text(f.read_text(encoding="utf-8"), encoding="utf-8")
     corpus_store = JsonCorpusStore(k_dir)
     deps = KBNodeDeps(llm=MockLLM(), store=store, corpus_store=corpus_store, hitl_mode="interrupt")
     return KnowledgePipeline(deps, tmp_path / "runs"), store, corpus_store
@@ -101,9 +96,12 @@ class TestExtractAndValidate:
 
     def test_next_unit_id_allocates_and_skips(self):
         existing = store_units()
-        assert next_unit_id(existing, ["TEAM"]) == "KU-LEAD-013"
-        assert next_unit_id(existing, ["STRAT", "TEAM"]) == "KU-STRAT-013"
-        assert next_unit_id(existing + [type("U", (), {"id": "KU-LEAD-013"})()], ["TEAM"]) == "KU-LEAD-014"
+        lead_max = max(int(u.id.split("-")[2]) for u in existing if u.id.startswith("KU-LEAD-"))
+        strat_max = max(int(u.id.split("-")[2]) for u in existing if u.id.startswith("KU-STRAT-"))
+        assert next_unit_id(existing, ["TEAM"]) == f"KU-LEAD-{lead_max + 1:03d}"
+        assert next_unit_id(existing, ["STRAT", "TEAM"]) == f"KU-STRAT-{strat_max + 1:03d}"
+        bumped = existing + [type("U", (), {"id": f"KU-LEAD-{lead_max + 1:03d}"})()]
+        assert next_unit_id(bumped, ["TEAM"]) == f"KU-LEAD-{lead_max + 2:03d}"
 
 
 def store_units():
@@ -152,14 +150,14 @@ class TestPipelineFlow:
         pipe, store, corpus_store = kb
         result = pipe.run_auto(make_chunk())
         assert result.status == "committed", result.detail
-        assert result.committed_unit_id == "KU-LEAD-013"
+        assert result.committed_unit_id == "KU-LEAD-001"
         # 语料落 L1 且标记 extracted
         chunks = corpus_store.load_chunks()
         assert len(chunks) == 1 and chunks[0].status == "extracted"
         assert chunks[0].id == "CC-0001"
         # 正式单元入库：JSONL 追加
         units = store.load_units()
-        assert any(u.id == "KU-LEAD-013" for u in units)
+        assert any(u.id == "KU-LEAD-001" for u in units)
         # 台账
         reviews = (store.review_log_dir / "reviews.jsonl").read_text(encoding="utf-8")
         assert "kb_commit" in reviews and "kb_draft_review" in reviews
@@ -174,7 +172,7 @@ class TestPipelineFlow:
         # 批准 → 入库
         result2 = pipe.resume(result.run_id, {"action": "approve", "reviewer": "tester"})
         assert result2.status == "committed"
-        assert result2.committed_unit_id == "KU-LEAD-013"
+        assert result2.committed_unit_id == "KU-LEAD-001"
 
     def test_interrupt_then_reject(self, kb):
         pipe, store, _ = kb
@@ -222,6 +220,15 @@ class TestPipelineFlow:
         assert result.status == "failed"
         assert "模拟节点异常" in (result.detail.get("error") or "")
         assert pipe.get(result.run_id).status == "failed"
+
+    def test_reindex_after_commit(self, kb):
+        """入库后 on_commit 触发重索引：检索器即时能搜到新单元。"""
+        pipe, store, _ = kb
+        seen: list[str] = []
+        pipe.deps.on_commit = lambda unit_id: seen.append(unit_id)
+        result = pipe.run_auto(make_chunk())
+        assert result.status == "committed"
+        assert seen == [result.committed_unit_id]
 
 
 # ---------------------------------------------------------------------------

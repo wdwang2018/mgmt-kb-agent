@@ -62,6 +62,7 @@ class KBNodeDeps:
     corpus_store: Any                              # JsonCorpusStore（语料层存取）
     hitl_mode: str = "interrupt"                   # interrupt | pause
     auto_approve: bool = False                     # Demo/评测用：跳过 interrupt 直接批准
+    on_commit: Any = None                          # 入库成功回调（重建检索索引，即时生效）
 
 
 # ---------------------------------------------------------------------------
@@ -380,6 +381,11 @@ def commit_draft(state: KBState, deps: KBNodeDeps) -> dict:
     draft.updated_at = _now()
     deps.store.log_review(state["run_id"], "kb_commit",
                           {"draft_id": draft.id, "unit_id": unit.id, "reviewer": reviewer})
+    if deps.on_commit:  # 入库成功即重建检索索引（课程生成立即可用新知识）
+        try:
+            deps.on_commit(unit.id)
+        except Exception:
+            pass  # 重索引失败不阻塞入库（下次服务启动仍会全量加载）
     return {"draft": draft, "committed_unit_id": unit.id, "status": "committed"}
 
 

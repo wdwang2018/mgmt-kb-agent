@@ -51,7 +51,8 @@ def test_by_ids_roundtrip():
     assert [u.id for u in units] == ["KU-LEAD-001", "KU-STRAT-002"]
 
 
-def test_loads_24_units_and_5_cases():
+def test_loads_units_and_cases():
     ctx = _ctx()
-    assert len(ctx.retriever.units) == 24
+    # 基线 24 个种子单元；知识流水线会持续入库（浏览器实测已 +1），故断言下限
+    assert len(ctx.retriever.units) >= 24
     assert len(ctx.pipeline.deps.cases) == 5

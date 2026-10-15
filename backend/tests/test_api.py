@@ -29,7 +29,7 @@ def test_healthz():
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == "ok"
-    assert body["knowledge_units"] == 24
+    assert body["knowledge_units"] >= 24  # 基线 24，知识流水线持续入库
 
 
 def test_run_then_resume_then_package():
