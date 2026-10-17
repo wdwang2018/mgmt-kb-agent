@@ -81,9 +81,9 @@ mgmt-kb-agent/
 ```bash
 PY="C:/Users/DELL/.workbuddy/binaries/python/envs/default/Scripts/python.exe"
 # 依赖已装在该受管 venv（langgraph 1.2.15 / fastapi / pydantic / pytest / httpx）
-# 向量检索：pymilvus 3.0.2 + milvus-lite 3.2.2（Windows 实测可用，无需 Docker）
+# 向量检索：pymilvus 3.0.2 + milvus-lite 3.2.2；图查询：kuzu 0.11.3（均 Windows 实测可用，无需 Docker）
 
-# 1. 测试（90 个）
+# 1. 测试（107 个）
 cd backend && "$PY" -m pytest
 
 # 2. Demo：内置真实需求 → 完整课程包（Mock 模式，无需 API Key，秒出）
@@ -109,6 +109,8 @@ cd backend && "$PY" -m pytest
 # POST /api/v1/kb/runs/{id}/review  审核决定 {"action":"approve"|"reject","note":"..."}
 # GET  /api/v1/kb/corpus         L1 语料层列表
 # GET  /api/v1/kb/taxonomy       受控代码表（六域/24 困境/证据等级/版权状态）
+# GET  /api/v1/kb/graph/{unit_id}  知识图谱查询（前置链/提出者/学派/争议/案例/邻居）
+# GET  /api/v1/kb/graph-stats    图规模统计
 
 # 5. 黄金评测（改模型/改门禁后必跑，不达标不上线）
 cd .. && "$PY" eval/run_eval.py
@@ -242,7 +244,7 @@ export GLM_MODEL=glm-5          # 默认 glm-4-plus；glm-5 质量高，glm-4-ai
 
 ## 已验证的真实运行记录
 
-- `pytest`：**90 passed**（课程设计全链路 + 知识流水线全链路 + 向量/混合检索层 + .env 加载）
+- `pytest`：**107 passed**（课程设计全链路 + 知识流水线全链路 + 向量/混合检索层 + 图查询层 + .env 加载）
 - `eval/run_eval.py`：完成率 100%、门禁通过率 100%、recall@5 100%、溯源覆盖率 100%、建设性对齐率 100%、域识别 100%、困境识别 100%
 - 知识流水线浏览器实测（Playwright 真实驱动）：语料提交 → DR-0001 草稿 → K1-K5 五项全过 → 批准入库 KU-LEAD-013 → 知识库 24→25 即时生效 → 台账/语料 extracted → JS 零错误，10/10 PASS
 - 修复并回归的真实缺陷：LangGraph interrupt 语义（实测后实现）、检查点 msgpack 白名单（含 KnowledgeUnit 内部三个枚举）、缩放舍入漂移、活动阈值丢弃导致 G3 失真、`normalize_mix` 死循环（过期快照值 + 零桶乒乓）、pydantic 列表拷贝导致域增强丢失、增强域目标无模块承载导致 G1 失败、Mock 抽取极短语料击穿 pydantic min_length、在线抽取脏 shape 构造前回退、`save_unit` 空目录崩溃、知识流水线 reject 路径缺终态节点
@@ -314,11 +316,46 @@ commit_draft 入库成功 → deps.on_commit(unit.id) → ctx.reindex()
 
 > ⚠️ `milvus_kb.db` 是二进制产物，已在 `.gitignore` 中排除，**切勿提交到仓库**。
 
+## 知识图谱与持久化（GraphRAG / PostgreSQL）
+
+数据来源是知识单元自带的 `relations`（提出者/学派/争议/对比/前置/应用）、`prerequisites`、`related` 字段，**入库时同步建边，无需改知识模型**。
+
+| 环境变量 | 取值 | 说明 |
+|---|---|---|
+| `GRAPH_MODE` | `none`（默认）/ `kuzu` / `neo4j` | 图查询开关：关闭 / 嵌入式图库 / 服务端图库 |
+| `GRAPH_DB_PATH` | 默认 `graph_kb.kuzu` | Kùzu 本地文件（**无需 Docker/Java**） |
+| `GRAPH_URI` / `GRAPH_USER` / `GRAPH_PASSWORD` | `bolt://localhost:7687` / `neo4j` / **必填** | Neo4j 连接（无默认口令，防误连本地空实例） |
+| `STORE_MODE` | `json`（默认）/ `pg` | 元数据存储：JSONL / PostgreSQL |
+| `PG_DSN` | 默认 `postgresql://postgres:postgres@localhost:5432/mgmtkb` | PG 连接串 |
+
+```bash
+# 开图查询（Kùzu 嵌入式，真跑无服务端）
+GRAPH_MODE=kuzu "$PY" -m uvicorn app.api.main:app --port 8932
+
+# 图查询 API
+curl localhost:8932/api/v1/kb/graph/KU-LEAD-001      # 前置链/提出者/学派/争议/案例/邻居
+curl localhost:8932/api/v1/kb/graph-stats            # 节点与关系边规模
+```
+
+**选型理由与实测（2026-10-17）**：Neo4j 服务端在当前环境不可行（无 Docker、无 Java），但 **Kùzu 提供 win_amd64 wheel、嵌入式免服务端、兼容 Cypher 子集**，实测 9 项能力全部通过（多跳前置链、争议观点、提出者、域过滤、聚合、参数化查询、**MERGE 幂等**、DETACH DELETE、持久化重开）。`Neo4jGraphStore` 与 `KuzuGraphStore` 同接口、Cypher 语句同构，装好 Neo4j 服务端后改一个环境变量即切换。
+
+**为什么默认 GRAPH_MODE=none**：图查询是增强能力而非基础设施，关闭时全链路照常可跑；26 单元规模下图查询价值主要在「争议观点呈现」与「前置链追溯」两个场景。
+
+**降级与维护约定**：
+
+1. `GRAPH_MODE=kuzu/neo4j` 构造失败 → 自动关闭图查询并记原因（经 `/healthz` 的 `graph_mode` / `graph_note` 暴露），不阻断启动；
+2. `STORE_MODE=pg` 连接失败 → 自动降级 JSONL 并记原因（`store_mode` / `store_note`）；
+3. 图与向量一样是**派生索引**：`reindex()` 里 `graph.rebuild(units)` 做差值同步（删陈旧节点 + MERGE 幂等重建），`knowledge/units/*.jsonl` 仍是唯一真相源；
+4. `rebuild` 传 `known_ids` 过滤**悬空引用**（related 指向已删单元时不建节点不建边），避免「先删后建」的白做功与边抖动；
+5. `*.kuzu` 是二进制产物，已排除出仓库，**切勿提交**。
+
+**诚实边界**：Neo4j 与 PostgreSQL 的真实服务端路径**尚未实测**（环境缺 Java/PG 服务端），当前验证的是 Kùzu 全链路 + Neo4j/PG 的降级路径；`PgMetadataStore` 的建表/upsert/台账写入逻辑待有服务端后验证。
+
 ## 路线
 
 - **P1 知识流水线**：✅ 已落地——采集（L1 语料带页码定位）→ 加工（规则/LLM 双模抽取）→ K1-K5 质检 → 人工审核台（Web 第四页签 + API）→ 编号入库即时生效
 - **P1 基础设施·向量检索**：✅ 已落地——`EmbeddingClient` 端口 + Mock/GLM 双 Embedding 适配器 + `MilvusRetriever`（Milvus Lite 本地文件、**无需 Docker**，COSINE 语义召回 + `ARRAY_CONTAINS` 标量过滤 + upsert 幂等）+ `HybridRetriever`（BM25 + 稠密双路召回、RRF 融合、稠密侧加权 2.0）+ `VECTOR_MODE` 三模式切换与自动降级
-- **P1 基础设施·其余**：⬜ Neo4j GraphRAG（概念/理论/人物关系推理）、PostgreSQL 元数据与审核台账持久化（端口已在 `ports.py` 预留，按需切换）
+- **P1 基础设施·图与持久化**：✅ 已落地——`GraphStore` 端口 + `KuzuGraphStore`（嵌入式、**实测 26 单元建出 103 条关系边**：前置链/提出者/学派/争议/案例查询全通）+ `Neo4jGraphStore`（lazy 占位，Cypher 同构可平移）+ `MetadataStore` 双适配器（JSON 默认 / PG lazy）+ `GRAPH_MODE` / `STORE_MODE` 切换与自动降级；**待实测**：Neo4j 与 PG 真实服务端路径（环境缺 Java/PG）
 - **P2 培训支撑扩展**：✅ Web 工作台已落地（课程设计/知识库/运行记录/知识流水线四页签）；待做：备课助手、学员导师、案例导演（多角色模拟）；Kirkpatrick L1-L4 回流
 - **P3 闭环运营**：学员画像、学习路径、课程包自动迭代
 

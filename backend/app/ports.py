@@ -58,9 +58,13 @@ class EmbeddingClient(Protocol):
 
 
 class KnowledgeStore(Protocol):
-    """知识库存储协议：P0 为 JSONL 文件，P1 切 PostgreSQL + Neo4j。"""
+    """知识库存储协议：默认 JSONL 文件，STORE_MODE=pg 切 PostgreSQL。"""
 
     def load_units(self) -> list[KnowledgeUnit]:
+        ...
+
+    def load_cases(self) -> list[dict[str, Any]]:
+        """加载 L3 案例卡（场景资产层）。"""
         ...
 
     def save_unit(self, unit: KnowledgeUnit) -> None:
@@ -71,4 +75,51 @@ class KnowledgeStore(Protocol):
         ...
 
 
-__all__ = ["LLMClient", "Retriever", "EmbeddingClient", "KnowledgeStore", "TrainingNeed"]
+class GraphStore(Protocol):
+    """知识图谱协议：前置链 / 提出者 / 争议观点 / 案例关联查询。
+
+    数据来源是知识单元自带的 relations / prerequisites / related 字段，
+    入库时由 sync_unit 同步建边，无需改知识模型。
+
+    适配器：
+    - KuzuGraphStore：嵌入式图库（本地文件、无服务端），GRAPH_MODE=kuzu，默认 none；
+    - Neo4jGraphStore：服务端版，GRAPH_MODE=neo4j，lazy import，连不上由工厂降级。
+    """
+
+    name: str
+
+    def sync_unit(self, unit: KnowledgeUnit) -> None:
+        """把单元及其关系写入图（MERGE 幂等，重复调用不写脏）。"""
+        ...
+
+    def rebuild(self, units: list[KnowledgeUnit]) -> None:
+        """全量重建图：删除陈旧 KU 节点后逐个 MERGE（差值同步）。"""
+        ...
+
+    def prerequisites(self, unit_id: str, depth: int = 3) -> list[str]:
+        """前置概念链（多跳遍历），返回祖先单元 id，近者在前。"""
+        ...
+
+    def proposers(self, unit_id: str) -> list[str]:
+        """理论提出者（relations 中 type=提出者）。"""
+        ...
+
+    def contested_views(self, unit_id: str) -> list[str]:
+        """争议/对立观点（relations 中 type=争议）——证据分级与学派争议的图查询入口。"""
+        ...
+
+    def applied_cases(self, unit_id: str) -> list[str]:
+        """关联案例卡（relations 中 type=应用 + related）。"""
+        ...
+
+    def neighbors(self, unit_id: str) -> dict[str, list[str]]:
+        """全部邻居，按关系类型分组（如 {"PREREQUISITE": [...], "PROPOSED_BY": [...]}）。"""
+        ...
+
+    def stats(self) -> dict[str, int]:
+        """图规模统计（ku_nodes / person_nodes / view_nodes / case_nodes / relations）。"""
+        ...
+
+
+__all__ = ["LLMClient", "Retriever", "EmbeddingClient", "KnowledgeStore",
+           "GraphStore", "TrainingNeed"]

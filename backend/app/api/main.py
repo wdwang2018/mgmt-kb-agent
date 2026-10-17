@@ -74,7 +74,9 @@ def healthz():
     c = _ctx()
     return {"status": "ok", "llm": c.pipeline.deps.llm.name,
             "knowledge_units": len(c.retriever.units),
-            "vector_mode": c.vector_mode, "vector_note": c.vector_note}
+            "vector_mode": c.vector_mode, "vector_note": c.vector_note,
+            "graph_mode": c.graph_mode, "graph_note": c.graph_note,
+            "store_mode": c.store_mode, "store_note": c.store_note}
 
 
 @app.post("/api/v1/runs")
@@ -200,6 +202,37 @@ def kb_taxonomy():
         "evidence_levels": [{"code": k, "name": v} for k, v in EVIDENCE_LEVELS.items()],
         "copyright_statuses": ["公版", "授权", "要点化", "原创"],
     }
+
+
+@app.get("/api/v1/kb/graph/{unit_id}")
+def kb_graph(unit_id: str):
+    """知识图谱查询（GraphRAG 入口）：前置链/提出者/学派/争议/案例/邻居。
+
+    GRAPH_MODE=none 时返回 enabled=False（图查询关闭，不影响其他端点）。
+    """
+    c = _ctx()
+    if c.graph is None:
+        return {"enabled": False, "graph_mode": c.graph_mode, "note": c.graph_note,
+                "unit_id": unit_id}
+    g = c.graph
+    return {
+        "enabled": True, "graph_mode": c.graph_mode, "unit_id": unit_id,
+        "prerequisites": g.prerequisites(unit_id, depth=3),
+        "proposers": g.proposers(unit_id),
+        "schools": g.schools(unit_id),
+        "contested_views": g.contested_views(unit_id),
+        "applied_cases": g.applied_cases(unit_id),
+        "neighbors": g.neighbors(unit_id),
+    }
+
+
+@app.get("/api/v1/kb/graph-stats")
+def kb_graph_stats():
+    """图规模统计（节点/关系边数）；图关闭时返回 enabled=False。"""
+    c = _ctx()
+    if c.graph is None:
+        return {"enabled": False, "graph_mode": c.graph_mode, "note": c.graph_note}
+    return {"enabled": True, "graph_mode": c.graph_mode, **c.graph.stats()}
 
 
 @app.post("/api/v1/kb/ingest")

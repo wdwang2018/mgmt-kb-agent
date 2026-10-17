@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..adapters.corpus_json import JsonCorpusStore
+from ..adapters.graph_factory import build_graph_store, build_metadata_store
 from ..adapters.kb_json import JsonKnowledgeStore
 from ..adapters.llm_factory import get_llm
 from ..adapters.retriever_factory import get_retriever
@@ -53,14 +54,23 @@ class AppContext:
     output_dir: Path
     vector_mode: str = "memory"
     vector_note: str | None = None
+    graph: object | None = None          # GraphStore | None（GRAPH_MODE=none 时为 None）
+    graph_mode: str = "none"
+    graph_note: str | None = None
+    store_mode: str = "json"
+    store_note: str | None = None
 
     def reindex(self) -> None:
-        """知识流水线入库后重建检索索引（适配器 reload 原地刷新，引用不变）。
+        """知识流水线入库后重建检索索引与知识图谱（适配器原地刷新，引用不变）。
 
         memory 模式：全量重建 BM25 统计量；
-        milvus 模式：upsert 向量并删除已移除项，保证索引与 JSONL 真相源一致。
+        milvus 模式：upsert 向量并删除已移除项，保证索引与 JSONL 真相源一致；
+        kuzu/neo4j 模式：MERGE 同步单元节点与关系边（幂等，重复调用不写脏）。
         """
-        self.retriever.reload(self.store.load_units())
+        units = self.store.load_units()
+        self.retriever.reload(units)
+        if self.graph is not None:
+            self.graph.rebuild(units)
 
 
 def build_context(knowledge_dir: str | Path | None = None,
@@ -73,12 +83,18 @@ def build_context(knowledge_dir: str | Path | None = None,
     k_dir = Path(knowledge_dir) if knowledge_dir else REPO_ROOT / "knowledge"
     o_dir = Path(output_dir) if output_dir else REPO_ROOT / "runs"
 
-    store = JsonKnowledgeStore(k_dir, review_log_dir=o_dir / "reviews")
+    # 元数据存储：STORE_MODE=json（默认，JSONL）/ pg（连不上自动降级）
+    store, store_mode, store_note = build_metadata_store(
+        k_dir, review_log_dir=o_dir / "reviews")
+    if not hasattr(store, "log_review"):  # 防御：工厂返回类型不符时退回 JSON
+        store, store_mode, store_note = JsonKnowledgeStore(k_dir), "json", "store 类型异常，已退回 JSONL"
     corpus_store = JsonCorpusStore(k_dir)
     units = store.load_units()
     # 检索模式由 VECTOR_MODE 决定；milvus 不可用时工厂自动降级为 memory 并带回原因
     retriever, vector_mode, vector_note = get_retriever(
         units, uri=str(k_dir / "milvus_kb.db"))
+    # 图存储：GRAPH_MODE=none（默认）/ kuzu（嵌入式）/ neo4j（服务端）
+    graph, graph_mode, graph_note = build_graph_store(units)
     deps = NodeDeps(
         llm=get_llm(),
         retriever=retriever,
@@ -100,6 +116,8 @@ def build_context(knowledge_dir: str | Path | None = None,
     ctx = AppContext(store=store, corpus_store=corpus_store, retriever=retriever,
                      pipeline=pipeline, kb_pipeline=kb_pipeline,
                      knowledge_dir=k_dir, output_dir=o_dir,
-                     vector_mode=vector_mode, vector_note=vector_note)
-    kb_deps.on_commit = lambda unit_id: ctx.reindex()  # 入库即重索引
+                     vector_mode=vector_mode, vector_note=vector_note,
+                     graph=graph, graph_mode=graph_mode, graph_note=graph_note,
+                     store_mode=store_mode, store_note=store_note)
+    kb_deps.on_commit = lambda unit_id: ctx.reindex()  # 入库即重索引 + 同步建图
     return ctx
