@@ -61,7 +61,7 @@ mgmt-kb-agent/
 │   │   └── api/               # FastAPI 路由（含 kb 流水线端点）+ security.py（P0 安全）+ observability.py/middleware.py（P2 可观测性）
 │   ├── observability/         # P2 可观测性：结构化日志 + 进程指标 + LLM 计时包装
 │   ├── scripts/               # run_demo / export_schemas / probe_langgraph
-│   └── tests/                 # 154 个测试（门禁/检索/原型/流水线/API/LLM 输出形状/知识流水线/安全/检查点/可观测性/LLM 降级链）
+│   └── tests/                 # 156 个测试（门禁/检索/原型/流水线/API/LLM 输出形状/知识流水线/安全/检查点/可观测性/LLM 降级链/token 计量）
 ├── knowledge/
 │   ├── units/                 # 知识单元（JSONL；lead_draft/strat_draft 为流水线入库文件）
 │   ├── corpus/                # L1 语料层（带页码定位，CC 编号）
@@ -464,8 +464,9 @@ curl localhost:8932/api/v1/kb/graph-stats            # 节点与关系边规模
 - **P1 基础设施·可靠性与 CI**：✅ 已落地——检查点持久化（sqlite 默认 + postgres 预留 + 降级链，重启续会话实测通过）+ GitHub Actions（pytest + 黄金评测 + 可选 Render 自动部署）
 - **P2 可观测性**：✅ 已落地——结构化日志（text/json 双格式 + 文件落盘）/ 进程指标（QPS·错误率·P95 延迟·LLM 耗时）/ 请求关联 ID 与 `/api/v1/metrics` 端点
 - **P3 韧性·LLM 故障降级链**：✅ 已落地——`FallbackLLM` 按 `LLM_FALLBACK_ORDER` 串联多后端，主模型（GLM）遇 429/5xx/网络抖动/无 Key 时自动回落下一级（如 Mock），流水线永不硬失败；`/healthz` 暴露 `llm_chain` 与 `llm_active_backend`，可观测性透传展示
+- **P3 token 计量**：✅ 已落地——`InstrumentedLLM` 包装层对每次调用的 `prompt(system+user)` 与 `completion(返回值)` 做中英混合 token 估算（CJK 每字 1 token、拉丁每 4 字符 1 token），累加 `prompt_tokens_total`/`completion_tokens_total`/`tokens_total`；经 `/api/v1/metrics` 与 `/healthz` 暴露，GLM/Mock/降级链共用同一计费口径
 - **P2 培训支撑扩展**：✅ Web 工作台已落地（课程设计/知识库/运行记录/知识流水线四页签）；待做：备课助手、学员导师、案例导演（多角色模拟）；Kirkpatrick L1-L4 回流
-- **P3 闭环运营**：学员画像、学习路径、课程包自动迭代；剩余工业级项：多实例限流（Redis）、token 计量、指标导出（Prometheus/Redis 多实例聚合）
+- **P3 闭环运营**：学员画像、学习路径、课程包自动迭代；剩余工业级项：多实例限流（Redis）、指标导出（Prometheus/Redis 多实例聚合）
 
 ## 约定
 

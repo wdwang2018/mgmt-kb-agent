@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 from app.observability.instrument import wrap_llm
 from app.observability.logging_setup import JSONFormatter, configure_logging
 from app.observability.metrics import metrics
+from app.observability.tokens import estimate_tokens
 
 
 def _client():
@@ -31,7 +32,8 @@ def test_healthz_carries_metrics():
     m = r.json()["metrics"]
     for k in ("uptime_seconds", "requests_total", "errors_total", "error_rate",
               "latency_p50_ms", "latency_p95_ms", "last_llm_ms",
-              "llm_calls_total", "knowledge_units"):
+              "llm_calls_total", "prompt_tokens_total", "completion_tokens_total",
+              "tokens_total", "knowledge_units"):
         assert k in m
     assert m["knowledge_units"] >= 24
 
@@ -110,6 +112,44 @@ def test_metrics_record_error_increments():
     assert metrics.snapshot(0)["errors_total"] == before + 1
 
 
+def test_estimate_tokens_mixed():
+    """中英混合 token 估算：CJK 每字 1 token，拉丁每 4 字符 1 token（向上取整）。"""
+    assert estimate_tokens("") == 0
+    assert estimate_tokens("管理") == 2                       # 2 个 CJK
+    assert estimate_tokens("hello world") == 3               # 11 拉丁字符 → (11+3)//4 = 3
+    assert estimate_tokens("管理hello") == 4                 # 2 CJK + 5 拉丁 → 2 + (5+3)//4 = 4
+    assert estimate_tokens("管理") == estimate_tokens("理管")  # 顺序无关
+
+
+def test_instrumented_llm_records_tokens():
+    """包装层对 prompt(system+user) 与 completion(返回值) 统一计费。"""
+    sys_p = "你是管理学专家"
+    usr_p = "设计一门新经理课程"
+    out_json = json.dumps({"text": "学会授权"}, ensure_ascii=False)
+    exp_prompt = estimate_tokens(sys_p + usr_p)
+    exp_comp_json = estimate_tokens(out_json)
+    exp_comp_text = estimate_tokens("管理者应放手")
+
+    class FakeLLM:
+        name = "fake-v1"
+
+        def complete_json(self, *a, **k):
+            return {"text": "学会授权"}
+
+        def complete(self, *a, **k):
+            return "管理者应放手"
+
+    before = metrics.snapshot(0)
+    w = wrap_llm(FakeLLM())
+    w.complete_json(p="", system=sys_p, user=usr_p, fallback={})
+    w.complete(p="", system=sys_p, user=usr_p)
+    after = metrics.snapshot(0)
+    # 两次调用各计入一次 prompt；两次 completion 分别来自 dict（json）与 str
+    assert after["prompt_tokens_total"] - before["prompt_tokens_total"] == 2 * exp_prompt
+    assert after["completion_tokens_total"] - before["completion_tokens_total"] == exp_comp_json + exp_comp_text
+    assert after["tokens_total"] == after["prompt_tokens_total"] + after["completion_tokens_total"]
+
+
 # ---------------------------------------------------------------------------
 # 变异验证：临时改坏下列实现应使对应测试失败（已人工核对，注释说明预期破坏）
 #   - 若 metrics.record_request 不执行 _requests += 1 → test_metrics_endpoint_increments 失败
@@ -117,4 +157,6 @@ def test_metrics_record_error_increments():
 #     仍过，但 test_metrics_endpoint_increments 会失败（计数不涨）
 #   - 若 InstrumentedLLM 在 finally 之外计时（或吞异常）→ test_instrumented_llm_records_timing 失败
 #   - 若 JSONFormatter 不输出 msg → test_json_formatter_emits_valid_json 失败
+#   - 若 estimate_tokens 恒返回 0 → test_estimate_tokens_mixed / test_instrumented_llm_records_tokens 失败
+#   - 若 metrics.record_llm_tokens 不累加 → test_instrumented_llm_records_tokens 失败
 # ---------------------------------------------------------------------------
