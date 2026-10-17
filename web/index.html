@@ -576,8 +576,10 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
 /* ==================== 基础 ==================== */
 const $ = (id) => document.getElementById(id);
 
-// API 基址：同源优先；独立打开（file:// 或预览面板）时回落本地服务，可用横幅修改
-const SAME_ORIGIN = location.protocol !== "file:" && location.port !== "";
+// API 基址：同源优先；独立打开（file://）时回落本地服务，可用横幅修改。
+// 注意：不能额外要求 location.port !== ""——线上部署（如 Render）走标准 443/80 端口时
+// port 为空串，曾被误判为非同源而回落 127.0.0.1:8000，导致「API 未连接」。
+const SAME_ORIGIN = location.protocol !== "file:";
 let API_BASE = localStorage.getItem("mgmt_api_base") || (SAME_ORIGIN ? "" : "http://127.0.0.1:8000");
 
 async function api(path, opts = {}) {
