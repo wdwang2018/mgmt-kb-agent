@@ -30,7 +30,9 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from ..domain.models import TrainingNeed
+from ..observability.metrics import metrics
 from ..services.context import AppContext, build_context
+from .observability import install_observability, observability_config_from_env
 from .security import install_security, security_config_from_env
 
 # Web 工作台静态目录：mgmt-kb-agent/web（相对本文件 backend/app/api/main.py 的上三级）
@@ -61,6 +63,8 @@ app = FastAPI(title="管理学知识库 Agent · 课程设计生成器", version
 # 线上在 Render Dashboard 填 API_KEY / CORS_ORIGINS 即启用。
 # /healthz 与静态首页永远豁免（健康检查与页面打开不依赖 Key）。
 install_security(app, security_config_from_env())
+# 可观测性（P2）：结构化日志 + 请求日志中间件 + 进程指标。未配置时默认 INFO/text/不落盘。
+install_observability(app, observability_config_from_env())
 
 
 class ResumeBody(BaseModel):
@@ -75,7 +79,18 @@ def healthz():
             "vector_mode": c.vector_mode, "vector_note": c.vector_note,
             "graph_mode": c.graph_mode, "graph_note": c.graph_note,
             "store_mode": c.store_mode, "store_note": c.store_note,
-            "checkpoint_mode": c.checkpoint_mode, "checkpoint_note": c.checkpoint_note}
+            "checkpoint_mode": c.checkpoint_mode, "checkpoint_note": c.checkpoint_note,
+            "metrics": metrics.snapshot(len(c.retriever.units))}
+
+
+@app.get("/api/v1/metrics")
+def metrics_endpoint():
+    """进程级运行指标（QPS/错误率/P95 延迟/LLM 耗时/知识单元数）。
+
+    属 API 端点，受 API Key 鉴权（与 /healthz 不同，可能暴露内部计数，不豁免）。
+    """
+    c = _ctx()
+    return metrics.snapshot(len(c.retriever.units))
 
 
 @app.post("/api/v1/runs")

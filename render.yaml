@@ -39,3 +39,9 @@ services:
         value: "300"             # 每 API Key 每分钟请求数；0 = 不限
       - key: RATE_LIMIT_WINDOW
         value: "60"              # 限流窗口秒数
+      # ---- P2 可观测性：结构化日志 ----
+      - key: LOG_LEVEL
+        value: "INFO"
+      - key: LOG_FORMAT
+        value: "json"            # 单行 JSON，便于 Render 日志面板/集中采集解析；本地可改 text
+      # LOG_DIR 不设置 = 仅控制台（Render 捕获 stdout）；如需落盘可设 /tmp/logs

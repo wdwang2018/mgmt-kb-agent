@@ -98,8 +98,15 @@ def build_context(knowledge_dir: str | Path | None = None,
         units, uri=str(k_dir / "milvus_kb.db"))
     # 图存储：GRAPH_MODE=none（默认）/ kuzu（嵌入式）/ neo4j（服务端）
     graph, graph_mode, graph_note = build_graph_store(units)
+    # LLM 透明计时包装（P2 可观测性）：异常不吞、不影响主链路；
+    # 任何 import 失败都退回原对象，绝不因可观测性阻断启动。
+    try:
+        from ..observability.instrument import wrap_llm
+        llm = wrap_llm(get_llm())
+    except Exception:  # pragma: no cover - 防御性兜底
+        llm = get_llm()
     deps = NodeDeps(
-        llm=get_llm(),
+        llm=llm,
         retriever=retriever,
         store=store,
         cases=store.load_cases(),

@@ -58,9 +58,10 @@ mgmt-kb-agent/
 │   │   ├── adapters/          # Mock/DeepSeek/GLM LLM、内存/Milvus/混合检索、JSON 知识库、JSON 语料层、Kùzu 图谱、PG 元数据
 │   │   ├── graph/             # 九节点(课程设计) + 五节点(知识流水线) + 四门禁/五质检 + HITL + checkpoint 工厂（sqlite 持久化）
 │   │   ├── services/          # 课程设计流水线 + 知识流水线 + 渲染 + 组合根
-│   │   └── api/               # FastAPI 路由（含 kb 流水线端点）+ security.py（P0 安全中间件）
+│   │   └── api/               # FastAPI 路由（含 kb 流水线端点）+ security.py（P0 安全）+ observability.py/middleware.py（P2 可观测性）
+│   ├── observability/         # P2 可观测性：结构化日志 + 进程指标 + LLM 计时包装
 │   ├── scripts/               # run_demo / export_schemas / probe_langgraph
-│   └── tests/                 # 136 个测试（门禁/检索/原型/流水线/API/LLM 输出形状/知识流水线/安全/检查点）
+│   └── tests/                 # 144 个测试（门禁/检索/原型/流水线/API/LLM 输出形状/知识流水线/安全/检查点/可观测性）
 ├── knowledge/
 │   ├── units/                 # 知识单元（JSONL；lead_draft/strat_draft 为流水线入库文件）
 │   ├── corpus/                # L1 语料层（带页码定位，CC 编号）
@@ -419,14 +420,34 @@ curl localhost:8932/api/v1/kb/graph-stats            # 节点与关系边规模
 
 配置方法：GitHub 仓库 → Settings → Secrets and variables → Actions → New repository secret，名 `RENDER_DEPLOY_HOOK`，值取 Render Dashboard → 服务 → Settings → Deploy Hook 生成的 URL。
 
+### P2 可观测性层（结构化日志 + 进程指标 + LLM 计时）
+
+免费 Render 实例**无日志留存**，一旦线上出问题只能靠结构化日志与指标端点自查——这是线上部署后最该补的一层（2026-10-17 落地）。全部环境变量驱动、未配置时默认 INFO / text 格式 / 仅控制台，零门槛。
+
+**结构**：
+- `backend/app/observability/logging_setup.py`：`configure_logging`（控制台 + 可选文件落盘 `RotatingFileHandler`，5MB×5 滚动）、`JSONFormatter`（单行 JSON，业务 extra 字段一并保留，便于 Render/ELK 采集）、`observability_config_from_env`
+- `backend/app/observability/metrics.py`：进程内指标累加器（线程安全）——请求数、错误数、错误率、P50/P95 延迟（滚动 500 样本）、**`last_llm_ms` / `llm_calls_total`**、知识单元数
+- `backend/app/observability/instrument.py`：`InstrumentedLLM` 透明包裹任意 LLMClient，记录每次调用耗时（`finally` 保证计时一定发生，异常不吞、不影响主链路）
+- `backend/app/api/middleware.py`：`RequestLoggingMiddleware`——透传/生成 `X-Request-ID`（跨服务追踪）、记录 method/path/status/毫秒延迟/IP/是否带 Key；未捕获异常记堆栈并计错误；`/healthz` 心跳只计数不打 INFO（防探针刷屏）
+- `backend/app/api/main.py`：`install_observability` 接线；`/healthz` 与新增 `/api/v1/metrics`（受 Key 鉴权）均返回指标快照
+
+| 环境变量 | 默认 | 说明 |
+|---|---|---|
+| `LOG_LEVEL` | `INFO` | DEBUG/INFO/WARNING/ERROR |
+| `LOG_FORMAT` | `text` | `text` = 本地可读；`json` = 单行 JSON（Render 日志面板/集中采集推荐） |
+| `LOG_DIR` | 未设 = 仅控制台 | 日志落盘目录（`working/logs/`，`.gitignore` 已排除）；不可写时自动退回控制台 |
+
+要点：① LLM 计时在组合根 `build_context` 用 `wrap_llm` 包裹，**import 失败兜底退回原对象**，绝不因可观测性阻断启动；② 指标为进程内累加器，单实例够用，多实例聚合需 Prometheus/Redis（后续项，见路线）；③ 测试 8 例（`tests/test_observability.py`）含 JSON 序列化、关联 ID 回传、计数器递增、LLM 计时与四轮变异验证。
+
 ## 路线
 
 - **P1 知识流水线**：✅ 已落地——采集（L1 语料带页码定位）→ 加工（规则/LLM 双模抽取）→ K1-K5 质检 → 人工审核台（Web 第四页签 + API）→ 编号入库即时生效
 - **P1 基础设施·向量检索**：✅ 已落地——`EmbeddingClient` 端口 + Mock/GLM 双 Embedding 适配器 + `MilvusRetriever`（Milvus Lite 本地文件、**无需 Docker**，COSINE 语义召回 + `ARRAY_CONTAINS` 标量过滤 + upsert 幂等）+ `HybridRetriever`（BM25 + 稠密双路召回、RRF 融合、稠密侧加权 2.0）+ `VECTOR_MODE` 三模式切换与自动降级
 - **P1 基础设施·图与持久化**：✅ 已落地——`GraphStore` 端口 + `KuzuGraphStore`（嵌入式、**实测 26 单元建出 103 条关系边**：前置链/提出者/学派/争议/案例查询全通）+ `Neo4jGraphStore`（lazy 占位，Cypher 同构可平移）+ `MetadataStore` 双适配器（JSON 默认 / PG lazy）+ `GRAPH_MODE` / `STORE_MODE` 切换与自动降级；**待实测**：Neo4j 与 PG 真实服务端路径（环境缺 Java/PG）
 - **P1 基础设施·可靠性与 CI**：✅ 已落地——检查点持久化（sqlite 默认 + postgres 预留 + 降级链，重启续会话实测通过）+ GitHub Actions（pytest + 黄金评测 + 可选 Render 自动部署）
+- **P2 可观测性**：✅ 已落地——结构化日志（text/json 双格式 + 文件落盘）/ 进程指标（QPS·错误率·P95 延迟·LLM 耗时）/ 请求关联 ID 与 `/api/v1/metrics` 端点
 - **P2 培训支撑扩展**：✅ Web 工作台已落地（课程设计/知识库/运行记录/知识流水线四页签）；待做：备课助手、学员导师、案例导演（多角色模拟）；Kirkpatrick L1-L4 回流
-- **P3 闭环运营**：学员画像、学习路径、课程包自动迭代；剩余工业级项：多实例限流（Redis）、LLM 故障降级链（GLM→DeepSeek→Mock）、token 计量与结构化日志
+- **P3 闭环运营**：学员画像、学习路径、课程包自动迭代；剩余工业级项：多实例限流（Redis）、LLM 故障降级链（GLM→DeepSeek→Mock）、token 计量与指标导出（Prometheus/Redis 多实例聚合）
 
 ## 约定
 
