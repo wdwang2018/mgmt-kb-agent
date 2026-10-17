@@ -81,8 +81,9 @@ mgmt-kb-agent/
 ```bash
 PY="C:/Users/DELL/.workbuddy/binaries/python/envs/default/Scripts/python.exe"
 # 依赖已装在该受管 venv（langgraph 1.2.15 / fastapi / pydantic / pytest / httpx）
+# 向量检索：pymilvus 3.0.2 + milvus-lite 3.2.2（Windows 实测可用，无需 Docker）
 
-# 1. 测试（58 个）
+# 1. 测试（90 个）
 cd backend && "$PY" -m pytest
 
 # 2. Demo：内置真实需求 → 完整课程包（Mock 模式，无需 API Key，秒出）
@@ -241,7 +242,7 @@ export GLM_MODEL=glm-5          # 默认 glm-4-plus；glm-5 质量高，glm-4-ai
 
 ## 已验证的真实运行记录
 
-- `pytest`：**58 passed**（课程设计全链路 + 知识流水线全链路：抽取/质检打回/唯一性/编号分配/HITL 挂起恢复/API 冒烟/坏 shape 回退/静态挂载与 runs 列表）
+- `pytest`：**90 passed**（课程设计全链路 + 知识流水线全链路 + 向量/混合检索层 + .env 加载）
 - `eval/run_eval.py`：完成率 100%、门禁通过率 100%、recall@5 100%、溯源覆盖率 100%、建设性对齐率 100%、域识别 100%、困境识别 100%
 - 知识流水线浏览器实测（Playwright 真实驱动）：语料提交 → DR-0001 草稿 → K1-K5 五项全过 → 批准入库 KU-LEAD-013 → 知识库 24→25 即时生效 → 台账/语料 extracted → JS 零错误，10/10 PASS
 - 修复并回归的真实缺陷：LangGraph interrupt 语义（实测后实现）、检查点 msgpack 白名单（含 KnowledgeUnit 内部三个枚举）、缩放舍入漂移、活动阈值丢弃导致 G3 失真、`normalize_mix` 死循环（过期快照值 + 零桶乒乓）、pydantic 列表拷贝导致域增强丢失、增强域目标无模块承载导致 G1 失败、Mock 抽取极短语料击穿 pydantic min_length、在线抽取脏 shape 构造前回退、`save_unit` 空目录崩溃、知识流水线 reject 路径缺终态节点
@@ -250,9 +251,74 @@ export GLM_MODEL=glm-5          # 默认 glm-4-plus；glm-5 质量高，glm-4-ai
 
 默认 `LLM_MODE=mock` 是**确定性模板桩**：保证无 API Key 下端到端可运行、可测试、可回归；它只做结构化装配与模板措辞，**事实性内容全部来自检索到的真实知识单元**（引用、误区、证据等级均为真）。内容的语言质量、情境贴合度由在线模型（`LLM_MODE=deepseek` 或 `LLM_MODE=glm`）承担，切换后需重跑 `eval/run_eval.py` 复测。知识流水线的「加工」节点同理：Mock 走关键词+句子切分规则抽取，在线走 LLM 萃取，两条路都过同一套 K1-K5 质检。
 
+## 检索与向量库（Milvus 混合检索）
+
+检索层按「端口-适配器」设计，通过环境变量切换，**图编排层与 Web 前端零改动**。
+
+| 环境变量 | 取值 | 说明 |
+|---|---|---|
+| `VECTOR_MODE` | `memory`（默认）/ `milvus` / `hybrid` | 检索实现：纯 BM25 / 纯稠密向量 / **双路召回 + RRF 融合（推荐）** |
+| `EMBED_MODE` | `mock`（默认）/ `glm` | Embedding 实现：确定性伪向量 / 智谱 `embedding-3` |
+| `EMBED_DIM` | `256`（mock）/ `2048`（glm） | 向量维度；**Milvus 集合按 dim 建，变更需重建集合** |
+| `MILVUS_URI` | 默认 `milvus_kb.db` | Milvus Lite 本地文件（**无需 Docker**） |
+| `MILVUS_COLLECTION` | 默认 `kb_units` | 集合名 |
+| `RRF_K` | 默认 `60` | RRF 融合平滑系数 |
+| `RRF_DENSE_WEIGHT` | 默认 `2.0` | 稠密侧权重（**实测必须 >1，见下**） |
+
+```bash
+# 默认 memory 模式（离线可跑，零向量依赖）
+"$PY" -m uvicorn app.api.main:app --port 8932
+
+# 切 Milvus 向量模式（先用无 Key 的确定性向量验证链路）
+VECTOR_MODE=milvus "$PY" -m uvicorn app.api.main:app --port 8932
+
+# 混合检索（推荐）：BM25 + 稠密向量双路召回，RRF 融合
+VECTOR_MODE=hybrid EMBED_MODE=glm "$PY" -m uvicorn app.api.main:app --port 8932
+```
+
+**为什么默认不是 Milvus**：26 个单元规模下 BM25 召回够用，向量库的真实收益只有两点——① **语义召回**（「授权/赋能/放权」词面不同但语义近，BM25 召回不到）；② 规模到千级单元后的检索效率。默认保留 memory 是为了「无 API Key、无向量依赖」下端到端仍可跑、可测。
+
+### 实测结论：混合检索 + 稠密侧加权（2026-10-17）
+
+三模式在两组查询上的 MRR（完整数据见 `eval/retrieval-bench-2026-10-17.md`）：
+
+| 查询组 | 纯 BM25 | 纯向量 | **混合（wd=2）** |
+|---|---|---|---|
+| A 黄金集 12 条（含 GROW/SBI/VRIO 等专有名词） | 1.000 | 1.000 | **1.000** |
+| B 语义改写 6 条（用户真实口吻） | 0.650 | 0.875 | **0.917** |
+
+三条关键结论：
+
+1. **等权融合是错的**。`wb:wd = 1:1` 时 B 组 MRR 只有 0.833，**反而低于纯向量的 0.875**——BM25 会把语义相近但非目标的单元顶到前列，等权融合被这种「伪关键词命中」拖累。
+2. **稠密侧权重 ≥1.5 后混合才真正同时优于两条单路线**（B 组 MRR 0.917 > 0.875 > 0.650，且 R@3 达 1.000），A 组维持 1.000 不受影响。1.5~3+ 是效果平台期，故默认取 **2.0** 居中。
+3. **代价是延迟**：纯 BM25 约 1ms，向量/混合约 300ms（每查询一次在线 embedding 往返）。
+
+> ⚠️ 诚实边界：B 组仅 6 条人工构造查询，0.833 与 0.917 的差距约等于 1~2 条查询的翻转，**样本量小，不宜过度解读**；权重取值依据的是「平台期内结论稳定」而非最优点拟合。
+
+**三条工程约定（都是踩坑后的设计）**：
+
+1. **md5 而非内置 `hash()`** 生成确定性伪向量（`embedding_mock.py`）——Python 内置 hash 受 `PYTHONHASHSEED` 随机化影响，跨进程不稳定，会导致同一文本两次 upsert 得到不同向量。
+2. **Embedding 异常不抛出，退回伪向量**（`embedding_glm.py`，沿用项目 `llm_glm` 的既有约定）——网络/鉴权/维度不一致都不阻断「入库即索引」链路；真实错误记在 `last_error` 供排查。
+3. **向量侧故障自动降级并记原因**（`retrieval_hybrid.py`）——构造失败降级为纯 memory，运行期 search/reload 失败当次退回 BM25 并记 `degrade_note`；降级状态经 `/healthz` 的 `vector_mode` / `vector_note` 暴露，避免「以为在用向量检索、其实已静默退化」的假象。
+
+**索引维护机制**（三种模式共用同一条链路，调用方零感知）：
+
+```
+commit_draft 入库成功 → deps.on_commit(unit.id) → ctx.reindex()
+                      → retriever.reload(store.load_units())
+                      → memory: 全量重建 BM25 统计量
+                        milvus/hybrid: 差值 upsert + 删除陈旧 ID（幂等，重复 reload 不写脏）
+```
+
+即 `knowledge/units/*.jsonl` 是**唯一真相源**，向量库只是可重建的派生索引（进程重启由 `_ensure_collection` 兜底；集合已存在且 dim 变更时自动 drop 重建）。
+
+> ⚠️ `milvus_kb.db` 是二进制产物，已在 `.gitignore` 中排除，**切勿提交到仓库**。
+
 ## 路线
 
-- **P1 知识流水线**：✅ 已落地——采集（L1 语料带页码定位）→ 加工（规则/LLM 双模抽取）→ K1-K5 质检 → 人工审核台（Web 第四页签 + API）→ 编号入库即时生效；待做：Milvus 混合检索 / Neo4j GraphRAG / PostgreSQL 存储适配器（端口已留，按需切换）
+- **P1 知识流水线**：✅ 已落地——采集（L1 语料带页码定位）→ 加工（规则/LLM 双模抽取）→ K1-K5 质检 → 人工审核台（Web 第四页签 + API）→ 编号入库即时生效
+- **P1 基础设施·向量检索**：✅ 已落地——`EmbeddingClient` 端口 + Mock/GLM 双 Embedding 适配器 + `MilvusRetriever`（Milvus Lite 本地文件、**无需 Docker**，COSINE 语义召回 + `ARRAY_CONTAINS` 标量过滤 + upsert 幂等）+ `HybridRetriever`（BM25 + 稠密双路召回、RRF 融合、稠密侧加权 2.0）+ `VECTOR_MODE` 三模式切换与自动降级
+- **P1 基础设施·其余**：⬜ Neo4j GraphRAG（概念/理论/人物关系推理）、PostgreSQL 元数据与审核台账持久化（端口已在 `ports.py` 预留，按需切换）
 - **P2 培训支撑扩展**：✅ Web 工作台已落地（课程设计/知识库/运行记录/知识流水线四页签）；待做：备课助手、学员导师、案例导演（多角色模拟）；Kirkpatrick L1-L4 回流
 - **P3 闭环运营**：学员画像、学习路径、课程包自动迭代
 

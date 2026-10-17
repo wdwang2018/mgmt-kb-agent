@@ -73,7 +73,8 @@ class ResumeBody(BaseModel):
 def healthz():
     c = _ctx()
     return {"status": "ok", "llm": c.pipeline.deps.llm.name,
-            "knowledge_units": len(c.retriever.units)}
+            "knowledge_units": len(c.retriever.units),
+            "vector_mode": c.vector_mode, "vector_note": c.vector_note}
 
 
 @app.post("/api/v1/runs")
