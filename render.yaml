@@ -24,3 +24,14 @@ services:
       # ---- 敏感项：sync:false 表示不进仓库，部署时在 Dashboard 手填 ----
       - key: GLM_API_KEY
         sync: false
+      # ---- P0 安全：API Key 鉴权（同步项仅 CORS/限流；Key 本身必须手填）----
+      - key: API_KEY
+        sync: false              # 设置后所有 API 请求需带 X-API-Key 头；/healthz 与首页豁免
+      - key: CORS_ORIGINS
+        value: "https://mgmt-kb-agent.onrender.com"   # 线上域名白名单（本地任意端口已内置放行）
+      - key: RATE_LIMIT_IP
+        value: "120"             # 每 IP 每分钟请求数；0 = 不限
+      - key: RATE_LIMIT_KEY
+        value: "300"             # 每 API Key 每分钟请求数；0 = 不限
+      - key: RATE_LIMIT_WINDOW
+        value: "60"              # 限流窗口秒数

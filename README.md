@@ -377,7 +377,7 @@ curl localhost:8932/api/v1/kb/graph-stats            # 节点与关系边规模
 | `milvus_kb.db` / `*.kuzu` | ⚠️ 重置 | 派生索引，启动时由 JSONL 自动重建（MERGE 幂等） |
 | `runs/`（课程包）、流水线审核入库的新单元 | ⚠️ 重置 | **线上定位为只读演示**；生产知识编辑以本地仓库为真相源；后续可接 Render Managed PG（`STORE_MODE=pg` 适配器已就位、未实测） |
 
-**上线步骤**：① Dashboard → New Blueprint 选本仓库 → ② 部署时填 `GLM_API_KEY` → ③ 拿到 URL 后验 `/healthz` 应返回 `llm=glm-*`、`vector_mode=hybrid`、`graph_mode=kuzu`（若为 `memory`/`none` 说明可选依赖没装上，已自动降级但功能仍完整）。
+**上线步骤**：① Dashboard → New Blueprint 选本仓库 → ② 部署时填 `GLM_API_KEY`（建议同时填 `API_KEY`，见下节）→ ③ 拿到 URL 后验 `/healthz` 应返回 `llm=glm-*`、`vector_mode=hybrid`、`graph_mode=kuzu`（若为 `memory`/`none` 说明可选依赖没装上，已自动降级但功能仍完整）。
 
 **已本地实测（2026-10-17）**：按 render.yaml 的启动命令与环境变量在 8934 端口起服务——20s 内完成启动，`/healthz` 三模式全开无降级、图统计 26 单元/103 边、Web 工作台与检索/图端点全部 200。
 
@@ -385,6 +385,20 @@ curl localhost:8932/api/v1/kb/graph-stats            # 节点与关系边规模
 - `/healthz`：`llm=glm-4-plus`、`vector_mode=hybrid`、`graph_mode=kuzu`——**milvus-lite 与 kuzu 的 Linux wheel 均安装成功，三模式零降级**；图统计 26 单元/13 学者/9 观点/2 案例/103 边与本地一致；
 - 课程设计全链路：POST `/api/v1/runs`（新任经理/180 分钟）**2.8s** 到达 confirm_targets 挂起点（GLM 经 Render 新加坡区访问国内 API 可达且快，能力目标诊断含 TEAM/EXEC/COACH 三域差距分析）→ approve 后 **93s** 完成：G1-G4 四门禁全过、7 模块、10 条布鲁姆可测量目标、21KB 课程包，引用溯源完整（《领导梯队》第3章、《成为管理者》第1-2章、《能力陷阱》第1、4章、《教练式管理》第2章，均带证据等级）；
 - 已知小瑕疵：LLM 偶将个别学习目标的所属域标注错位（如项目群目标标"沟通影响"），G1 建设性对齐门禁不校验域标注，待后续在门禁或后处理中收紧。
+
+### P0 安全层（API Key 鉴权 + CORS 白名单 + 限流）
+
+`backend/app/api/security.py`，三个中间件全部环境变量驱动、**未配置时整体退化为开放模式**（本地开发/测试零门槛）：
+
+| 环境变量 | 默认 | 说明 |
+|---|---|---|
+| `API_KEY` | 未设 = 不校验 | 设置后所有 API 请求需带 `X-API-Key` 头；`/healthz`、`/docs`、静态首页豁免（健康检查与页面打开不依赖 Key） |
+| `CORS_ORIGINS` | 空 | 逗号分隔的额外允许 origin（填线上域名）；本地 `127.0.0.1`/`localhost` 任意端口已内置放行（预览面板场景） |
+| `RATE_LIMIT_IP` | 120 | 每 IP 每窗口请求数，0 = 不限 |
+| `RATE_LIMIT_KEY` | 300 | 每 API Key 每窗口请求数，0 = 不限 |
+| `RATE_LIMIT_WINDOW` | 60 | 限流窗口秒数；超限返回 429 + `Retry-After` |
+
+要点：① 限流位于 Key 校验外层——**401 请求也计 IP 额度**（防暴力探测），有意为之；② 限流为进程内滑动窗口，单实例够用，多实例共享需 Redis（后续项）；③ Web 工作台收到 401 时弹出琥珀色横幅引导输入 Key，存 `localStorage` 持久化，填一次即记住；④ 测试 15 例（`tests/test_security.py`）含四轮变异验证，pytest 总计 123 全过。
 
 ## 路线
 

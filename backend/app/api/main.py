@@ -25,13 +25,13 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from ..domain.models import TrainingNeed
 from ..services.context import AppContext, build_context
+from .security import install_security, security_config_from_env
 
 # Web 工作台静态目录：mgmt-kb-agent/web（相对本文件 backend/app/api/main.py 的上三级）
 WEB_DIR = Path(__file__).resolve().parents[3] / "web"
@@ -56,13 +56,11 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="管理学知识库 Agent · 课程设计生成器", version="0.2.0", lifespan=lifespan)
 
-# CORS：Web 工作台既可同源（挂载于本服务）也可独立打开（预览面板/其他端口）
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# 安全层（P0）：API Key 认证 + CORS 白名单 + 限流。
+# 环境变量未配置时整体退化为开放模式（本地开发/测试零门槛）；
+# 线上在 Render Dashboard 填 API_KEY / CORS_ORIGINS 即启用。
+# /healthz 与静态首页永远豁免（健康检查与页面打开不依赖 Key）。
+install_security(app, security_config_from_env())
 
 
 class ResumeBody(BaseModel):

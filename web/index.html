@@ -288,6 +288,13 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
 }
 #api-banner input{padding:4px 8px;border:1px solid #fecaca;border-radius:6px;font-size:12.5px;width:220px;background:#fff}
 #api-banner .btn-sm{padding:3px 10px}
+#key-banner{
+  display:none;background:#fffbeb;border:1px solid #fde68a;color:#92400e;
+  padding:9px 16px;font-size:13px;border-radius:8px;margin-bottom:14px;
+  align-items:center;gap:10px;flex-wrap:wrap;
+}
+#key-banner input{padding:4px 8px;border:1px solid #fde68a;border-radius:6px;font-size:12.5px;width:220px;background:#fff}
+#key-banner .btn-sm{padding:3px 10px}
 </style>
 </head>
 <body>
@@ -331,6 +338,12 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
       <input id="api-base-input" placeholder="http://127.0.0.1:8000" value="http://127.0.0.1:8000">
       <button class="btn btn-sm" id="api-base-save">连接</button>
       <span style="font-size:12px">请先在 backend 目录启动：uvicorn app.api.main:app</span>
+    </div>
+    <div id="key-banner">
+      <span>🔑 服务已启用 API Key 鉴权</span>
+      <input id="api-key-input" type="password" placeholder="粘贴服务端配置的 API_KEY">
+      <button class="btn btn-sm" id="api-key-save">连接</button>
+      <span style="font-size:12px">本地开发未设 API_KEY 时不会出现此条；填一次即记住（ localStorage ）</span>
     </div>
 
     <!-- ============ Tab 1：课程设计 ============ -->
@@ -581,13 +594,19 @@ const $ = (id) => document.getElementById(id);
 // port 为空串，曾被误判为非同源而回落 127.0.0.1:8000，导致「API 未连接」。
 const SAME_ORIGIN = location.protocol !== "file:";
 let API_BASE = localStorage.getItem("mgmt_api_base") || (SAME_ORIGIN ? "" : "http://127.0.0.1:8000");
+// API Key（P0 安全）：服务端设了 API_KEY 才需要；本地未设时为空、无感。
+let API_KEY = localStorage.getItem("mgmt_api_key") || "";
 
 async function api(path, opts = {}) {
-  const r = await fetch(API_BASE + path, opts);
+  const headers = { ...(opts.headers || {}) };
+  if (API_KEY) headers["X-API-Key"] = API_KEY;
+  const r = await fetch(API_BASE + path, { ...opts, headers });
   if (!r.ok) {
     let msg = r.status + " " + r.statusText;
     try { const j = await r.json(); msg = j.detail || msg; } catch (_) {}
-    throw new Error(msg);
+    const err = new Error(msg);
+    err.status = r.status;   // detail 会覆盖 msg 前缀，必须显式带状态码供调用方分流
+    throw err;
   }
   return r;
 }
@@ -603,16 +622,36 @@ async function refreshConn() {
   const pill = $("conn-pill"), text = $("conn-text");
   try {
     const j = await (await api("/healthz")).json();
+    // /healthz 豁免鉴权，必须再探一个真实端点验证 Key 是否有效
+    await api("/api/v1/archetypes");
     pill.className = "pill ok";
     text.textContent = `已连接 · LLM=${j.llm} · 知识单元 ${j.knowledge_units}`;
     $("api-banner").style.display = "none";
+    $("key-banner").style.display = "none";
     return j;
   } catch (e) {
     pill.className = "pill bad";
-    text.textContent = "API 未连接";
-    $("api-banner").style.display = "flex";
+    if (e.status === 401) {
+      // 服务端启用了 API Key：引导输入（区别于「连不上」）
+      text.textContent = "需要 API Key";
+      $("api-banner").style.display = "none";
+      $("key-banner").style.display = "flex";
+    } else {
+      text.textContent = "API 未连接";
+      $("key-banner").style.display = "none";
+      $("api-banner").style.display = "flex";
+    }
     return null;
   }
+}
+
+// 重新加载当前页签的数据（Key 保存成功后调用）
+function reloadActiveTab() {
+  const active = document.querySelector(".nav-item.active");
+  const tab = active && active.dataset.tab;
+  if (tab === "kb") loadKb();
+  else if (tab === "runs") loadRuns();
+  else if (tab === "kbpipe") loadKbPipe();
 }
 
 $("api-base-save").onclick = () => {
@@ -620,6 +659,17 @@ $("api-base-save").onclick = () => {
   localStorage.setItem("mgmt_api_base", API_BASE);
   refreshConn();
 };
+
+$("api-key-save").onclick = async () => {
+  API_KEY = $("api-key-input").value.trim();
+  if (!API_KEY) return;
+  localStorage.setItem("mgmt_api_key", API_KEY);
+  const j = await refreshConn();
+  if (j) reloadActiveTab();   // 连通后立即刷新当前页签数据
+};
+$("api-key-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") $("api-key-save").click();
+});
 
 /* ==================== Tab 切换 ==================== */
 document.querySelectorAll(".nav-item").forEach((btn) => {
@@ -1146,16 +1196,20 @@ const graphCache = {};               // unit_id → 图查询结果，避免重�
 const GRAPH_AUTO_TOP = 5;            // 检索结果前 N 张卡片自动展开图谱
 
 async function loadGraphStats() {
-  graphStatsLoaded = true;
+  // 注意：graphStatsLoaded 只能成功后锁定——若在入口无条件置位，
+  // 无 Key 时首次探测 401 被 catch 后会永久 poisoning：
+  // 用户输入 Key 后 loadKb 跳过探测，graphEnabled 永远 false，图谱面板不渲染。
   try {
     const j = await (await api("/api/v1/kb/graph-stats")).json();
     graphEnabled = !!j.enabled;
     graphMode = j.graph_mode || "none";
+    graphStatsLoaded = true;
     $("kb-graph-stat").textContent = graphEnabled
       ? `🕸 图谱（${graphMode}）：${j.ku_nodes ?? 0} 单元 · ${j.person_nodes ?? 0} 学者 · ${j.view_nodes ?? 0} 观点 · ${j.relations ?? 0} 边`
       : "";
   } catch (_) {
     graphEnabled = false;
+    graphStatsLoaded = false;   // 失败不锁定，下次 loadKb 允许重试（如 Key 刚填好）
     $("kb-graph-stat").textContent = "";
   }
 }

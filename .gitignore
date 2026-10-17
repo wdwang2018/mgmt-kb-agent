@@ -18,3 +18,5 @@ milvus_kb.db
 # 工具缓存
 .playwright-cli/
 web/shot-*.png
+# 本地临时工作目录（验证脚本/截图脚本，不入库）
+working/
