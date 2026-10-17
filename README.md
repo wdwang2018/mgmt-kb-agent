@@ -355,6 +355,32 @@ curl localhost:8932/api/v1/kb/graph-stats            # 节点与关系边规模
 
 **诚实边界**：Neo4j 与 PostgreSQL 的真实服务端路径**尚未实测**（环境缺 Java/PG 服务端），当前验证的是 Kùzu 全链路 + Neo4j/PG 的降级路径；`PgMetadataStore` 的建表/upsert/台账写入逻辑待有服务端后验证。
 
+## 部署到 Render（2026-10-17，Blueprint 一键部署）
+
+仓库根 `render.yaml`：Render Dashboard → **New Blueprint** 选 `wdwang2018/mgmt-kb-agent` 即按蓝图建服务，无需手填构建/启动命令。
+
+| 配置项 | 值 | 说明 |
+|---|---|---|
+| 形态 | 单 Web Service（runtime: python） | FastAPI 同时伺服 API + `web/` 静态工作台，零前后端分离 |
+| 构建 | `pip install -r requirements.txt` | 仓库根同一份依赖（含 milvus-lite / kuzu 可选增强） |
+| 启动 | `cd backend && uvicorn app.api.main:app --host 0.0.0.0 --port $PORT` | `$PORT` 由 Render 注入；路径全按 `__file__` 相对定位，与 cwd 无关 |
+| 健康检查 | `/healthz` | 同时暴露 llm / vector_mode / graph_mode / store_mode，退化一目了然 |
+| 计划 / 区域 | free / Singapore | 免费 750 小时/月；冷启动约 50s；国内访问延迟最低 |
+
+环境变量（render.yaml 预设）：`LLM_MODE=glm`、`VECTOR_MODE=hybrid`、`EMBED_MODE=glm`、`GRAPH_MODE=kuzu`、`PYTHON_VERSION=3.13.0`；**`GLM_API_KEY` 用 `sync: false`，只在你 Render 后台填、不进仓库**（沿用白起SSE 敏感 env 约定）。未填 Key 时 LLM 自动回落 mock，不阻断启动。
+
+**持久化边界（诚实说明）**：Render free 计划无持久磁盘，重启/重新部署后文件系统重置——
+
+| 数据 | 命运 | 说明 |
+|---|---|---|
+| `knowledge/*.jsonl`（26 单元 + 案例） | ✅ 保留 | 在 git 仓库，随镜像部署 |
+| `milvus_kb.db` / `*.kuzu` | ⚠️ 重置 | 派生索引，启动时由 JSONL 自动重建（MERGE 幂等） |
+| `runs/`（课程包）、流水线审核入库的新单元 | ⚠️ 重置 | **线上定位为只读演示**；生产知识编辑以本地仓库为真相源；后续可接 Render Managed PG（`STORE_MODE=pg` 适配器已就位、未实测） |
+
+**上线步骤**：① Dashboard → New Blueprint 选本仓库 → ② 部署时填 `GLM_API_KEY` → ③ 拿到 URL 后验 `/healthz` 应返回 `llm=glm-*`、`vector_mode=hybrid`、`graph_mode=kuzu`（若为 `memory`/`none` 说明可选依赖没装上，已自动降级但功能仍完整）。
+
+**已本地实测（2026-10-17）**：按 render.yaml 的启动命令与环境变量在 8934 端口起服务——20s 内完成启动，`/healthz` 三模式全开无降级、图统计 26 单元/103 边、Web 工作台与检索/图端点全部 200。
+
 ## 路线
 
 - **P1 知识流水线**：✅ 已落地——采集（L1 语料带页码定位）→ 加工（规则/LLM 双模抽取）→ K1-K5 质检 → 人工审核台（Web 第四页签 + API）→ 编号入库即时生效
