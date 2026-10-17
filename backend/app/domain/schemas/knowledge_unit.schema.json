@@ -152,7 +152,7 @@
   "description": "L2 知识单元：概念/理论/模型/工具/研究结论，按管理困境挂接。",
   "properties": {
     "id": {
-      "pattern": "^KU-(LEAD|STRAT)-\\d{3}$",
+      "pattern": "^KU-(LEAD|STRAT|CLASSIC|BEHAV|CHINA|QUALITY|ORGLEARN)-\\d{3}$",
       "title": "Id",
       "type": "string"
     },
@@ -188,6 +188,15 @@
       "description": "是否存在学派争议，需并列呈现",
       "title": "Contested",
       "type": "boolean"
+    },
+    "lineage": {
+      "default": [],
+      "description": "学派/年代谱系代码（双轴索引之一），如 L-CLASSIC/L-BEHAV/L-CHINA，见 domain.constants.THEORY_LINEAGE",
+      "items": {
+        "type": "string"
+      },
+      "title": "Lineage",
+      "type": "array"
     },
     "source": {
       "$ref": "#/$defs/SourceRef"

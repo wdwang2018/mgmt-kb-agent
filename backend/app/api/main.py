@@ -220,7 +220,7 @@ def kb_units(domain: str | None = None, dilemma: str | None = None, q: str | Non
         units = c.retriever.search(q, domains=[domain] if domain else None,
                                    dilemmas=[dilemma] if dilemma else None, top_k=10)
     return [{"id": u.id, "title": u.title, "type": u.type.value, "domains": u.domains,
-             "dilemmas": u.dilemmas, "evidence_level": u.evidence_level.value,
+             "dilemmas": u.dilemmas, "lineage": u.lineage, "evidence_level": u.evidence_level.value,
              "contested": u.contested, "misconceptions": [x.claim for x in u.misconceptions],
              "source": f"{u.source.author}《{u.source.book}》{u.source.locator}",
              "key_points": u.key_points} for u in units]

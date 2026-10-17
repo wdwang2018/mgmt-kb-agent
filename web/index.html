@@ -225,6 +225,7 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
 .u-tags{display:flex;flex-wrap:wrap;gap:5px}
 .u-tag{font-size:11px;padding:1px 8px;border-radius:99px;background:#f3f4f6;color:var(--text-2);border:1px solid var(--border)}
 .u-tag.domain{background:var(--primary-soft);color:var(--primary);border-color:#c7d2fe}
+.u-tag.lineage{background:#ecfeff;color:#0e7490;border-color:#a5f3fc}
 .u-source{font-size:12px;color:var(--text-2);background:#f9fafb;border-left:3px solid var(--border-2);padding:5px 10px;border-radius:0 6px 6px 0}
 .u-points{list-style:none;font-size:12.8px;display:flex;flex-direction:column;gap:4px}
 .u-points li{padding-left:14px;position:relative}
@@ -467,6 +468,9 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
           <option value="A">A · 实证强支持</option>
           <option value="B">B · 情境依赖</option>
           <option value="C">C · 经验争议</option>
+        </select>
+        <select id="kb-lineage">
+          <option value="">全部学派谱系</option>
         </select>
         <span class="kb-count" id="kb-count"></span>
         <span id="kb-graph-stat"></span>
@@ -1167,6 +1171,11 @@ const DOMAIN_NAMES = {
   STRAT: "战略思维", TEAM: "团队领导", CHANGE: "变革管理",
   COMM: "沟通影响", COACH: "教练辅导", EXEC: "执行落地",
 };
+const LINEAGE_NAMES = {
+  "L-CLASSIC": "古典管理学派", "L-BEHAV": "行为科学学派", "L-CONTINGENCY": "权变与系统学派",
+  "L-STRATEGY": "战略学派", "L-LEADERSHIP": "领导力发展学派", "L-QUALITY": "质量与精益学派",
+  "L-ORGLEARN": "组织学习与知识学派", "L-CHINA": "中国管理学与本土实践",
+};
 
 async function loadKb() {
   if (!graphStatsLoaded) await loadGraphStats();
@@ -1181,14 +1190,24 @@ async function loadKb() {
   const q = $("kb-q").value.trim();
   const domain = domainSel.value;
   const evidence = $("kb-evidence").value;
+  const lineageSel = $("kb-lineage");
+  if (lineageSel.options.length <= 1) {
+    for (const [code, name] of Object.entries(LINEAGE_NAMES)) {
+      const o = document.createElement("option");
+      o.value = code; o.textContent = name;
+      lineageSel.appendChild(o);
+    }
+  }
+  const lineage = lineageSel.value;
   const params = new URLSearchParams();
   if (q) params.set("q", q);
   if (domain) params.set("domain", domain);
   let units = await (await api("/api/v1/kb/units?" + params.toString())).json();
   if (evidence) units = units.filter((u) => u.evidence_level === evidence);
+  if (lineage) units = units.filter((u) => (u.lineage || []).includes(lineage));
   $("kb-count").textContent = `共 ${units.length} 个知识单元`;
   if (!units.length) {
-    $("kb-grid").innerHTML = '<div class="kb-empty">没有匹配的知识单元——P0 仅覆盖「新任管理者转型」「战略共识与解码」两个主题</div>';
+    $("kb-grid").innerHTML = '<div class="kb-empty">没有匹配的知识单元——试试调整领域 / 学派谱系 / 关键词</div>';
     return;
   }
   const evName = { A: "A · 实证强支持", B: "B · 情境依赖", C: "C · 经验争议" };
@@ -1202,6 +1221,7 @@ async function loadKb() {
         <span class="badge badge-${(u.evidence_level || "B").toLowerCase()}">${evName[u.evidence_level] || u.evidence_level}</span>
         ${u.contested ? '<span class="badge badge-contested">⚔ 学派争议</span>' : ""}
         ${(u.domains || []).map((d) => `<span class="u-tag domain">${esc(DOMAIN_NAMES[d] || d)}</span>`).join("")}
+        ${(u.lineage || []).map((d) => `<span class="u-tag lineage">${esc(LINEAGE_NAMES[d] || d)}</span>`).join("")}
         ${(u.dilemmas || []).map((d) => `<span class="u-tag">${esc(d)}</span>`).join("")}
       </div>
       <div class="u-source">📖 ${esc(u.source)}</div>
@@ -1219,6 +1239,7 @@ let kbTimer = null;
 $("kb-q").addEventListener("input", () => { clearTimeout(kbTimer); kbTimer = setTimeout(loadKb, 300); });
 $("kb-domain").onchange = loadKb;
 $("kb-evidence").onchange = loadKb;
+$("kb-lineage").onchange = loadKb;
 
 /* ==================== 知识图谱（GraphRAG） ==================== */
 let graphEnabled = false;            // 后端 GRAPH_MODE 是否开启（none 时为 false）

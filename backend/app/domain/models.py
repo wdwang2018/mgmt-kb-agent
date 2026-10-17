@@ -83,13 +83,18 @@ class Relation(BaseModel):
 class KnowledgeUnit(BaseModel):
     """L2 知识单元：概念/理论/模型/工具/研究结论，按管理困境挂接。"""
 
-    id: str = Field(pattern=r"^KU-(LEAD|STRAT)-\d{3}$")
+    id: str = Field(pattern=r"^KU-(LEAD|STRAT|CLASSIC|BEHAV|CHINA|QUALITY|ORGLEARN)-\d{3}$")
     title: str
     type: KUType
     domains: list[str] = Field(description="胜任力域代码，如 TEAM/STRAT")
     dilemmas: list[str] = Field(description="困境索引代码，如 D01")
     evidence_level: EvidenceLevel
     contested: bool = Field(default=False, description="是否存在学派争议，需并列呈现")
+    lineage: list[str] = Field(
+        default_factory=list,
+        description="学派/年代谱系代码（双轴索引之一），如 L-CLASSIC/L-BEHAV/L-CHINA，"
+        "见 domain.constants.THEORY_LINEAGE",
+    )
     source: SourceRef
     key_points: list[str] = Field(min_length=2, description="要点化摘要（非原文复制）")
     misconceptions: list[Misconception] = Field(default_factory=list)

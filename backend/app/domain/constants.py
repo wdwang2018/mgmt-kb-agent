@@ -135,3 +135,59 @@ DEFAULT_70_20_10_RULE = {
     "social_min": 0.20,
     "formal_max": 0.50,
 }
+
+# ---------------------------------------------------------------------------
+# 学派 / 年代谱系（知识单元「双轴索引」之一：与能力域×困境正交）
+# 用于「系统整理管理理论」：给理论一条演进主干，避免只按困境松散罗列。
+# 知识单元的 lineage 字段引用这里的 code（可多选）。
+# ---------------------------------------------------------------------------
+THEORY_LINEAGE = {
+    "L-CLASSIC": {
+        "name": "古典管理学派",
+        "era": "1900s–1930s",
+        "desc": "以效率与结构为核心：科学管理（Taylor）、一般管理（Fayol 14 原则/五职能）、官僚组织（Weber）、人际关系萌芽（Mayo 霍桑）。",
+        "authors": ["Taylor", "Fayol", "Weber", "Mayo"],
+    },
+    "L-BEHAV": {
+        "name": "行为科学学派",
+        "era": "1930s–1960s",
+        "desc": "关注人性假设与个体/群体动机：X-Y 理论（McGregor）、需求层次（Maslow）、双因素（Herzberg）、成就需要（McClelland）、期望理论（Vroom）、公平理论（Adams）、群体动力（Tuckman）。",
+        "authors": ["Mayo", "McGregor", "Maslow", "Herzberg", "McClelland", "Vroom", "Adams", "Tuckman"],
+    },
+    "L-CONTINGENCY": {
+        "name": "权变与系统学派",
+        "era": "1960s–1980s",
+        "desc": "否认放之四海皆准：领导随准备度而变（Hersey/Blanchard、Fiedler）、路径-目标（House）、组织与环境匹配（Lawrence & Lorsch）、系统观（Katz & Kahn）、管理角色（Mintzberg）。",
+        "authors": ["Hersey", "Blanchard", "Fiedler", "House", "Lawrence", "Lorsch", "Mintzberg"],
+    },
+    "L-STRATEGY": {
+        "name": "战略学派",
+        "era": "1970s–",
+        "desc": "回答「打哪、凭什么赢」：定位观（Porter 五力/三大战略）、资源基础观（Barney VRIO）、动态能力（Teece）、好战略（Rumelt）、蓝海（Kim & Mauborgne）、平衡计分卡/战略地图（Kaplan & Norton）、OKR/OGSM 目标管理体系。",
+        "authors": ["Porter", "Barney", "Teece", "Rumelt", "Kim", "Mauborgne", "Kaplan", "Norton", "Doerr"],
+    },
+    "L-LEADERSHIP": {
+        "name": "领导力发展学派",
+        "era": "1980s–",
+        "desc": "超越职位权力：变革型领导（Burns/Bass）、魅力领导（House）、仆人式领导（Greenleaf）、真实领导、新经理转身（Hill/Ibarra）、教练与反馈（Whitmore/CCL）。",
+        "authors": ["Burns", "Bass", "House", "Greenleaf", "Hill", "Ibarra", "Whitmore"],
+    },
+    "L-QUALITY": {
+        "name": "质量与精益学派",
+        "era": "1950s–",
+        "desc": "以客户与流程为中心：全面质量管理/PDCA（Deming）、质量成本（Juran）、丰田生产方式/精益（Ohno）、六西格玛。",
+        "authors": ["Deming", "Juran", "Ohno"],
+    },
+    "L-ORGLEARN": {
+        "name": "组织学习与知识学派",
+        "era": "1970s–",
+        "desc": "组织如何习得与创造：行动学习（Argyris 双环学习）、知识创造（Nonaka SECI）、学习型组织（Senge 五项修炼）。",
+        "authors": ["Argyris", "Nonaka", "Senge"],
+    },
+    "L-CHINA": {
+        "name": "中国管理学与本土实践",
+        "era": "1980s–",
+        "desc": "中国情境下的管理思想与标杆实践：中国式管理（曾仕强）、共生/组织文化（陈春花）、和谐管理（席酉民）、东方管理学（苏东水）；标杆企业——华为（以奋斗者为本/灰度）、海尔（人单合一）、联想（复盘）、稻盛和夫（阿米巴/敬天爱人）、宋志平（央企市营）、宁高宁。",
+        "authors": ["曾仕强", "陈春花", "席酉民", "苏东水", "张瑞敏", "任正非", "柳传志", "稻盛和夫", "宋志平", "宁高宁"],
+    },
+}

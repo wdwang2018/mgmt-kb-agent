@@ -52,7 +52,7 @@
 mgmt-kb-agent/
 ├── backend/
 │   ├── app/
-│   │   ├── domain/            # 领域内核：constants（六域×L1-L5、24 困境）、models（pydantic）
+│   │   ├── domain/            # 领域内核：constants（六域×L1-L5、24 困境、8 学派谱系 THEORY_LINEAGE）、models（pydantic）
 │   │   │   └── schemas/       # 导出的 JSON Schema（三个核心工件）
 │   │   ├── ports.py           # 端口协议（LLM/检索/知识库/嵌入/图谱/元数据）
 │   │   ├── adapters/          # Mock/DeepSeek/GLM LLM、内存/Milvus/混合检索、JSON 知识库、JSON 语料层、Kùzu 图谱、PG 元数据
@@ -63,11 +63,12 @@ mgmt-kb-agent/
 │   ├── scripts/               # run_demo / export_schemas / probe_langgraph
 │   └── tests/                 # 158 个测试（门禁/检索/原型/流水线/API/LLM 输出形状/知识流水线/安全/检查点/可观测性/LLM 降级链/token 计量/逐任务归因）
 ├── knowledge/
-│   ├── units/                 # 知识单元（JSONL；lead_draft/strat_draft 为流水线入库文件）
+│   ├── units/                 # 知识单元（JSONL）：lead_draft/strat_draft 为流水线入库文件；
+│   │                         #   classical_mgmt / behavioral_science / quality_systems / china_mgmt 为 P4 系统收集
 │   ├── corpus/                # L1 语料层（带页码定位，CC 编号）
 │   ├── cases/                 # 5 个中国情境案例卡
 │   ├── reviews/               # 人工审核台账（runs 联动）
-│   └── books/                 # 38 本核心书目清单（要点化状态跟踪）
+│   └── books/                 # 69 本核心书目清单（国内外名家，要点化状态跟踪）
 ├── eval/
 │   ├── golden/                # 黄金评测集（12 需求 + 12 检索查询）
 │   └── run_eval.py            # 评测脚本 → report-<日期>.md
@@ -214,7 +215,7 @@ export GLM_MODEL=glm-5          # 默认 glm-4-plus；glm-5 质量高，glm-4-ai
 | 页签 | 功能 |
 |---|---|
 | **课程设计** | 需求诊断单表单（七要素 + 时长快捷档）→ 九节点流水线进度条 → 人工审核卡片（能力目标确认/门禁升级，批准或带反馈打回）→ 课程包 Markdown 渲染 + 一键下载 |
-| **知识库** | 知识单元检索：关键词 + 领域 + 证据等级（A/B/C）筛选；卡片含引用定位、学员常见误区、学派争议标记；**图谱关系面板**（GraphRAG） |
+| **知识库** | 知识单元检索：关键词 + 领域 + 证据等级（A/B/C）+ **学派谱系（lineage 双轴筛选）**；卡片含引用定位、学员常见误区、学派争议标记、学派谱系标签；**图谱关系面板**（GraphRAG） |
 | **运行记录** | 历史 run 列表（状态/对象/时长/模块数/**Token**），点击回看课程包 |
 | **知识流水线**（P1） | 语料采集表单 → 五节点进度 → 草稿审核卡片（K1-K5 明细、批准/打回）→ 草稿台账 + L1 语料层；待审数量实时徽标 |
 | **TOKEN 消耗**（P3） | 全局累计统计卡（合计/提示词/生成/LLM 调用）+ 逐任务明细表（每条 run 的提示词/生成/合计/调用次数，持久化可回看）；课程包完成页同步显示该次 Token 消耗 |
@@ -233,7 +234,8 @@ export GLM_MODEL=glm-5          # 默认 glm-4-plus；glm-5 质量高，glm-4-ai
 
 1. **能力模型**：六域（战略思维/团队领导/变革管理/沟通影响/教练辅导/执行落地）× L1-L5 行为锚定 → `domain/schemas/competency_model.schema.json`
 2. **困境索引 v1**：24 个管理困境标签（D01-D24），知识按困境挂接 → `domain/schemas/dilemma_index.schema.json`
-3. **知识单元**：概念/理论/模型/工具/研究结论，含证据等级（A 实证强支持/B 情境依赖/C 经验争议）、误区、关系（提出者/学派/争议/前置/应用）→ `domain/schemas/knowledge_unit.schema.json`
+3. **知识单元**：概念/理论/模型/工具/研究结论，含证据等级（A 实证强支持/B 情境依赖/C 经验争议）、误区、关系（提出者/学派/争议/前置/应用），以及 **`lineage` 学派谱系标签（双轴索引之一）** → `domain/schemas/knowledge_unit.schema.json`
+4. **学派谱系（P4 新增·双轴）**：8 条演进主干（古典/行为科学/权变系统/战略/领导力发展/质量精益/组织学习/中国管理学），与能力域×困境正交 → `domain/constants.py` 的 `THEORY_LINEAGE`
 
 设计取舍：按「管理困境」而非「名词」索引——学员带着困境来，不是带着「我想学波特五力」来。
 
@@ -241,7 +243,7 @@ export GLM_MODEL=glm-5          # 默认 glm-4-plus；glm-5 质量高，glm-4-ai
 
 | PRD P0 验收标准 | 实测 | 结论 |
 |---|---|---|
-| 30-50 本核心书目 + 两主题要点化 | 38 本书目清单；24 个知识单元要点化（12+12） | ✅ |
+| 30-50 本核心书目 + 两主题要点化 | 69 本书目清单（国内外名家）；45 个知识单元（领导力12+战略12+草稿2+古典4+行为6+质量/系统2+中国7），全部带 lineage 学派标签 | ✅ |
 | 图谱 Schema | 三个 JSON Schema 导出 + 关系字段落地 | ✅ |
 | 黄金评测集 | 24 条（12 需求 + 12 查询） | ✅ |
 | 问答/生成 Demo 可跑通 | 端到端 Demo + API + 29 测试全过 | ✅ |
@@ -469,6 +471,7 @@ curl localhost:8932/api/v1/kb/graph-stats            # 节点与关系边规模
 - **P3 token 逐任务归因 + Web 面板**：✅ 已落地——流水线 `_invoke` 用 `contextvar` 绑定 `run_id`，每次 LLM 调用同时计入「进程级全局」与「该任务独立桶」；任务桶随 `state.json` 持久化（重启仍可查）。新增 `GET /api/v1/tokens`（全局累计 + 逐任务明细），Web 工作台新增「TOKEN 消耗」页签（全局统计卡 + 逐任务表：提示词/生成/合计/调用次数），并在「运行记录」表与课程包完成页同步展示每条任务的 token 消耗
 - **P2 培训支撑扩展**：✅ Web 工作台已落地（课程设计/知识库/运行记录/知识流水线四页签）；待做：备课助手、学员导师、案例导演（多角色模拟）；Kirkpatrick L1-L4 回流
 - **P3 闭环运营**：学员画像、学习路径、课程包自动迭代；剩余工业级项：多实例限流（Redis）、指标导出（Prometheus/Redis 多实例聚合）
+- **P4 理论谱系 + 国内外书库系统收集**：✅ 已落地——新增 `lineage` 学派谱系字段（双轴索引之一，与能力域×困境正交）+ `THEORY_LINEAGE` 八主干常量（古典/行为科学/权变系统/战略/领导力发展/质量精益/组织学习/中国管理学）；系统补齐知识单元 26→45（新增古典管理 4 / 行为科学·激励 6 / 质量·系统 2 / 中国管理学 7，含曾仕强·陈春花·席酉民·华为·海尔·联想·稻盛和夫等），全部回填 lineage；核心书目 38→69（含 Taylor/Fayol/Weber/Mayo/Maslow/McGregor/Herzberg/Vroom/Adams/Deming/Senge 等国际名家 + 曾仕强/陈春花/席酉民/苏东水/张瑞敏/宋志平/宁高宁等中国名家）；Web 知识库页新增「学派谱系」筛选下拉 + 卡片谱系标签。黄金评测七项仍 100%、pytest 158 全过
 
 ## 约定
 

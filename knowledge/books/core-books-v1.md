@@ -61,6 +61,57 @@
 | 37 | 复盘（联想方法论） | 联想管理学院 | 复盘四步：回顾目标-评估结果-分析原因-总结经验 | C | P1 待要点化 | 原创要点化 |
 | 38 | 领导梯队实践相关：《执行力》 | Larry Bossidy & Ram Charan | 执行三流程：人员/战略/运营 | B | P1 待要点化 | 要点化 |
 
+## 五、古典管理奠基（P4 已补知识单元）
+
+| # | 书名 | 作者 | 核心论点 | 证据 | 要点化状态 | 版权 |
+|---|---|---|---|---|---|---|
+| 39 | 科学管理原理 The Principles of Scientific Management | Frederick W. Taylor | 用科学方法替代经验直觉，方法标准化与差别计件工资 | B | 已要点化(P4) | 要点化 |
+| 40 | 工业管理与一般管理 General and Industrial Management | Henri Fayol | 五大管理职能与 14 项原则，管理作为通用职能独立 | C | 已要点化(P4) | 要点化 |
+| 41 | 经济与社会（官僚制） Economy and Society | Max Weber | 法理型权威与官僚制六大特征，现代组织理性化基础 | B | 已要点化(P4) | 要点化 |
+| 42 | 工业文明的人类问题 The Human Problems of an Industrial Civilization | Elton Mayo | 霍桑效应与社会人假设，开启行为科学 | B | 已要点化(P4) | 要点化 |
+
+## 六、行为科学与激励名家（P4 已补知识单元）
+
+| # | 书名 | 作者 | 核心论点 | 证据 | 要点化状态 | 版权 |
+|---|---|---|---|---|---|---|
+| 43 | 动机与人格 Motivation and Personality | Abraham H. Maslow | 需求层次五阶段，高阶需求驱动 | C | 已要点化(P4) | 要点化 |
+| 44 | 企业的人性面 The Human Side of Enterprise | Douglas McGregor | X-Y 理论，人性假设决定管理风格 | C | 已要点化(P4) | 要点化 |
+| 45 | 工作与人性 Work and the Nature of Man | Frederick Herzberg | 双因素理论，保健 vs 激励因素 | B | 已要点化(P4) | 要点化 |
+| 46 | 成就社会 The Achieving Society | David McClelland | 成就/归属/权力三需要 | B | 已要点化(P4) | 要点化 |
+| 47 | 工作与激励 Work and Motivation | Victor H. Vroom | 期望理论，激励力=期望×工具性×效价 | B | 已要点化(P4) | 要点化 |
+| 48 | 工资公平理论（社会交换中的不平等） | J. Stacy Adams | 公平理论，投入产出比相对公平感 | B | 已要点化(P4) | 要点化 |
+| 49 | 权变领导理论 A Theory of Leadership Effectiveness | Fred Fiedler | 权变领导模型，效能取决于情境控制力 | B | P1 待要点化 | 要点化 |
+| 50 | 路径-目标领导 Path-Goal Theory | Robert House | 领导行为匹配下属特质与任务环境 | B | P1 待要点化 | 要点化 |
+
+## 七、质量·精益·系统·组织学习（P4 已补知识单元）
+
+| # | 书名 | 作者 | 核心论点 | 证据 | 要点化状态 | 版权 |
+|---|---|---|---|---|---|---|
+| 51 | 第五项修炼 The Fifth Discipline | Peter M. Senge | 学习型组织五项修炼，系统思考为核心 | B | 已要点化(P4) | 要点化 |
+| 52 | 走出危机 Out of the Crisis | W. Edwards Deming | TQM 与 PDCA，质量源于系统改进 | B | 已要点化(P4) | 要点化 |
+| 53 | 丰田生产方式 | 大野耐一 | 精益生产，消除浪费（muda）与准时化 | B | P1 待要点化 | 要点化 |
+| 54 | 追求卓越 In Search of Excellence | Peters & Waterman | 卓越企业八特质，文化与管理并重 | C | P1 待要点化 | 要点化 |
+| 55 | 高效能人士的七个习惯 The 7 Habits | Stephen Covey | 由内而外、要事第一的效能原则 | C | P1 待要点化 | 要点化 |
+| 56 | 战略与结构 Strategy and Structure | Alfred Chandler | 结构跟随战略，多分部制演化 | B | P1 待要点化 | 要点化 |
+| 57 | 管理行为 Administrative Behavior | Herbert A. Simon | 有限理性与满意化决策 | A | P1 待要点化 | 要点化 |
+| 58 | 知识创造公司 The Knowledge-Creating Company | Ikujiro Nonaka | SECI 模型，隐性/显性知识转化 | B | P1 待要点化 | 要点化 |
+| 59 | 仆人式领导 Servant Leadership | Robert K. Greenleaf | 领导者先服务他人，授权与赋能 | C | P1 待要点化 | 要点化 |
+
+## 八、中国名家与本土实践（P4 已补知识单元）
+
+| # | 书名 | 作者 | 核心论点 | 证据 | 要点化状态 | 版权 |
+|---|---|---|---|---|---|---|
+| 60 | 中国式管理 | 曾仕强 | 情理法兼顾、中庸权变、修己安人 | C | 已要点化(P4) | 要点化 |
+| 61 | 管理的常识 / 共生 | 陈春花 | 回归管理常识，数字化时代共生组织 | C | 已要点化(P4) | 要点化 |
+| 62 | 和谐管理理论 | 席酉民 | 谐则与和则双规则耦合 | C | 已要点化(P4) | 要点化 |
+| 63 | 以奋斗者为本（华为管理纲要） | 黄卫伟/华为 | 以奋斗者为本、灰度管理 | C | 已要点化(P4) | 要点化 |
+| 64 | 海尔转型：人单合一 | 张瑞敏/海尔 | 人单合一、小微自组织 | C | 已要点化(P4) | 要点化 |
+| 65 | 复盘：把经验转化为能力 | 联想管理学院 | 复盘四步，经验变组织能力 | 原创 | 已要点化(P4) | 原创 |
+| 66 | 阿米巴经营 / 活法 | 稻盛和夫 | 阿米巴最小核算单元、敬天爱人 | C | 已要点化(P4) | 要点化 |
+| 67 | 东方管理学 | 苏东水 | 以人为本、以德为先、人为为人 | C | P1 待要点化 | 要点化 |
+| 68 | 经营方略 / 央企市营 | 宋志平 | 央企市场化经营、整合优化 | C | P1 待要点化 | 要点化 |
+| 69 | 企业迷思 / 管理实说 | 宁高宁 | 战略与资本视角下的企业管理 | C | P1 待要点化 | 要点化 |
+
 ## 待采购决策
 
 - 商业案例库（哈佛/Ivey 等）：P2 评估，需授权采购预算。
