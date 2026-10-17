@@ -118,7 +118,8 @@ class CorpusChunk(BaseModel):
     locator: str = Field(description="定位：章节/页码/小节")
     copyright_status: Literal["公版", "授权", "要点化", "原创"] = "要点化"
     text: str = Field(description="语料正文（授权摘要/要点化转述，不整文复制）")
-    ingested_by: str = Field(default="manual", description="采集方式：manual/auto")
+    unit_id: Optional[str] = Field(default=None, description="回链：该语料被抽成的知识单元 KU 编号")
+    ingested_by: str = Field(default="manual", description="采集方式：manual/auto/backfill")
     status: Literal["raw", "extracted"] = Field(default="raw", description="raw=待加工，extracted=已抽成草稿")
 
 

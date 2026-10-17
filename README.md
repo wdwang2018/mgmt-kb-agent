@@ -66,7 +66,9 @@ mgmt-kb-agent/
 │   ├── units/                 # 知识单元（JSONL）：lead_draft/strat_draft 为流水线入库文件；
 │   │                         #   classical_mgmt / behavioral_science / quality_systems / china_mgmt（P4）+ contingency_decision /
 │   │                         #   leadership_dev / strategy_behavior / quality_learn_china（P5）为系统收集
-│   ├── corpus/                # L1 语料层（带页码定位，CC 编号）
+│   ├── corpus/                # L1 语料层（要点级粒度，CC 编号）：294 条 = 2 人工采集
+│   │                         #   + 292 条由 73 单元逐条要点回填（?unit_id=KU-xxx 反查）
+│   │                         #   存储陷阱：只能有 corpus-v1.jsonl 一个文件（详见脚本注释）
 │   ├── cases/                 # 5 个中国情境案例卡
 │   ├── reviews/               # 人工审核台账（runs 联动）
 │   └── books/                 # 69 本核心书目清单（国内外名家，要点化状态跟踪）
@@ -112,7 +114,8 @@ cd backend && "$PY" -m pytest
 # GET  /api/v1/kb/runs           草稿审核台账
 # GET  /api/v1/kb/runs/{id}      草稿详情（含质检明细）
 # POST /api/v1/kb/runs/{id}/review  审核决定 {"action":"approve"|"reject","note":"..."}
-# GET  /api/v1/kb/corpus         L1 语料层列表
+# GET  /api/v1/kb/corpus         L1 语料层列表（要点级；透明出 unit_id / ingested_by）
+# GET  /api/v1/kb/corpus?unit_id=KU-xxx  反查某单元的全部出处语料（溯源到具体章节）
 # GET  /api/v1/kb/taxonomy       受控代码表（六域/24 困境/证据等级/版权状态）
 # GET  /api/v1/kb/graph/{unit_id}  知识图谱查询（前置链/提出者/学派/争议/案例/邻居）
 # GET  /api/v1/kb/graph-stats    图规模统计
@@ -474,6 +477,7 @@ curl localhost:8932/api/v1/kb/graph-stats            # 节点与关系边规模
 - **P3 闭环运营**：学员画像、学习路径、课程包自动迭代；剩余工业级项：多实例限流（Redis）、指标导出（Prometheus/Redis 多实例聚合）
 - **P4 理论谱系 + 国内外书库系统收集**：✅ 已落地——新增 `lineage` 学派谱系字段（双轴索引之一，与能力域×困境正交）+ `THEORY_LINEAGE` 八主干常量（古典/行为科学/权变系统/战略/领导力发展/质量精益/组织学习/中国管理学）；系统补齐知识单元 26→45（新增古典管理 4 / 行为科学·激励 6 / 质量·系统 2 / 中国管理学 7，含曾仕强·陈春花·席酉民·华为·海尔·联想·稻盛和夫等），全部回填 lineage；核心书目 38→69（含 Taylor/Fayol/Weber/Mayo/Maslow/McGregor/Herzberg/Vroom/Adams/Deming/Senge 等国际名家 + 曾仕强/陈春花/席酉民/苏东水/张瑞敏/宋志平/宁高宁等中国名家）；Web 知识库页新增「学派谱系」筛选下拉 + 卡片谱系标签。黄金评测七项仍 100%、pytest 158 全过
 - **P5 剩余 P1 书要点化 + 学派演进图谱**：✅ 已落地——将剩余 P1 待要点化书（Fiedler/House/Mintzberg/Simon/Kotter/Kouzes/Greenleaf/Collins/Charan/Covey/Buckingham/Drucker/Chandler/Christensen/Kim/Trout/Slywotzky/Pink/Kahneman/Cialdini/Dweck/Lencioni/Ohno/Nonaka/苏东水/宋志平/宁高宁/田涛 等 28 本）转为知识单元，总数 45→73；新增 `L-DECISION` 决策科学学派 + `CONT`/`DEC`/`LDS` 三个 ID 前缀；Web 知识库页新增「📊 学派演进图谱」视图（横向时序主干 + 9 学派节点 + 各学派单元卡片，点击下钻到卡片检索）；新增 `GET /api/v1/kb/lineages` 端点。黄金评测七项仍 100%、pytest 158 全过
+- **P5 L1 语料层回填（要点级溯源）**：✅ 已落地——原先单元只能溯源到「书 + 章节」，且 corpus 仅 2 条样例。现由 `scripts/backfill_corpus.py` 为每个单元的每条要点生成一条 `CC` 语料（292 条，总计 294），带该单元 `source.locator` 并以 `unit_id` 回链；`CorpusChunk` 新增 `unit_id` 字段，`GET /api/v1/kb/corpus?unit_id=KU-xxx` 支持反查。**重要语义边界**：回填内容是「要点化转述」而非原书逐字摘录（`CorpusChunk.text` 的 schema 即规定「不整文复制」），一律标记 `ingested_by="backfill"` 以区别于人工采集；日后拿到真书原文可整条替换。脚本幂等，改动单元要点后须重跑（有测试守红）。pytest 165 全过、黄金评测七项 100%
 
 ## 约定
 

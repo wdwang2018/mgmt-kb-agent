@@ -346,13 +346,22 @@ def kb_review(run_id: str, body: ReviewBody):
 
 
 @app.get("/api/v1/kb/corpus")
-def kb_corpus():
-    """L1 语料层列表。"""
+def kb_corpus(unit_id: str = ""):
+    """L1 语料层列表（要点级粒度）。
+
+    ?unit_id=KU-XXX 可过滤出该单元的全部出处语料——即「溯源到具体章节」的反向查询入口。
+    unit_id 为空表示该条尚未回链（宁可不链，不可错链）。
+    """
     c = _ctx()
+    chunks = c.corpus_store.load_chunks()
+    if unit_id:
+        chunks = [ch for ch in chunks if ch.unit_id == unit_id]
     return [{"id": ch.id, "book": ch.book, "author": ch.author, "year": ch.year,
              "locator": ch.locator, "copyright_status": ch.copyright_status,
+             "unit_id": ch.unit_id,          # 回链：该语料被抽成的知识单元
+             "ingested_by": ch.ingested_by,  # manual=人工采集 / backfill=由单元回填
              "status": ch.status, "text_preview": ch.text[:120]}
-            for ch in c.corpus_store.load_chunks()]
+            for ch in chunks]
 
 
 # Web 工作台静态挂载：API 路由均注册在前，优先匹配；其余路径回落 web/index.html
