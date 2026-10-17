@@ -7,21 +7,48 @@
 <title>管理学知识库 Agent · 工作台</title>
 <style>
 :root{
-  --bg:#f4f5fa; --panel:#fff; --border:#e5e7eb; --border-2:#d1d5db;
-  --text:#1f2937; --text-2:#6b7280; --text-3:#9ca3af;
-  --primary:#4f46e5; --primary-hover:#4338ca; --primary-soft:#eef2ff;
-  --green:#059669; --green-soft:#ecfdf5;
-  --amber:#b45309; --amber-soft:#fffbeb;
-  --red:#dc2626; --red-soft:#fef2f2;
-  --blue:#2563eb; --blue-soft:#eff6ff;
-  --shadow:0 1px 3px rgba(16,24,40,.06),0 1px 2px rgba(16,24,40,.04);
-  --radius:10px;
+  /* —— 底／描边：纸感暖中性，避开纯白纯黑 —— */
+  --bg:#f6f5f2; --paper:#fcfcfb; --paper-2:#f2f0ea;
+  --rule:#e3e0d8; --rule-2:#cbc7bb;
+  /* —— 文本 —— */
+  --text:#22201d; --text-2:#6b675f; --text-3:#948f85;
+  /* —— 主色·墨蓝（H208 S38% L30%，大学出版社色） —— */
+  --ink:#2b4c6f; --ink-hover:#1f3b58; --ink-soft:#eaeef3;
+  /* —— 语义色：低饱和 —— */
+  --verde:#3f6f52; --verde-soft:#edf3ef;
+  --ochre:#8a6d1f; --ochre-soft:#fbf6e8;
+  --brick:#8f2f2f; --brick-soft:#fbf0f0;
+  --azure:#37618c; --azure-soft:#eaf0f7;
+  --seal:#9a3324; --seal-soft:#fbf0ee;
+  /* —— 字体：学术感第一来源是衬线体 —— */
+  --font-serif:Georgia,"Times New Roman","Songti SC","STSong","SimSun",serif;
+  --font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  --font-mono:ui-monospace,SFMono-Regular,Consolas,monospace;
+  /* —— 圆角／阴影：克制 —— */
+  --r-xs:2px; --r-sm:3px; --r-md:4px; --r-lg:6px;
+  --shadow-card:0 1px 2px rgba(34,32,29,.04);
+  --shadow-pop:0 4px 14px rgba(34,32,29,.10);
+
+  /* —— 兼容层：旧变量名指向新值，200+ 处引用零改动 —— */
+  --panel:var(--paper); --border:var(--rule); --border-2:var(--rule-2);
+  --primary:var(--ink); --primary-hover:var(--ink-hover); --primary-soft:var(--ink-soft);
+  --green:var(--verde); --green-soft:var(--verde-soft);
+  --amber:var(--ochre); --amber-soft:var(--ochre-soft);
+  --red:var(--brick); --red-soft:var(--brick-soft);
+  --blue:var(--azure); --blue-soft:var(--azure-soft);
+  --shadow:var(--shadow-card); --radius:var(--r-md);
 }
 *{box-sizing:border-box;margin:0;padding:0}
+/* E 项：键盘可达性焦点环（原为 0） */
+*:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+/* 无障碍：尊重系统「减少动态效果」偏好（原为 0） */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
+}
 html,body{height:100%}
 body{
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
-  background:var(--bg); color:var(--text); font-size:14px; line-height:1.6;
+  font-family:var(--font-sans);
+  background:var(--bg); color:var(--text); font-size:14px; line-height:1.65;
   display:flex; flex-direction:column;
 }
 button{font:inherit;cursor:pointer;border:none;background:none;color:inherit}
@@ -34,19 +61,19 @@ header{
 }
 .brand{display:flex;align-items:center;gap:10px}
 .logo{
-  width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#4f46e5,#7c3aed);
-  color:#fff;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;
+  width:32px;height:32px;border-radius:var(--r-sm);background:var(--ink);
+  color:#fff;font-family:var(--font-serif);font-weight:700;font-size:17px;display:flex;align-items:center;justify-content:center;
 }
-.brand .title{font-weight:600;font-size:15px}
+.brand .title{font-family:var(--font-serif);font-weight:600;font-size:16px;letter-spacing:.01em}
 .brand .subtitle{font-size:12px;color:var(--text-2);margin-top:-2px}
 .pill{
-  font-size:12px;padding:3px 10px;border-radius:99px;border:1px solid var(--border);
+  font-size:12px;padding:3px 10px;border-radius:var(--r-xs);border:1px solid var(--border);
   color:var(--text-2);background:#fafafa;display:flex;align-items:center;gap:6px;white-space:nowrap;
 }
 .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--text-3)}
-.pill.ok{color:var(--green);background:var(--green-soft);border-color:#a7f3d0}
+.pill.ok{color:var(--green);background:var(--green-soft);border-color:#c9dbd0}
 .pill.ok .dot{background:var(--green)}
-.pill.bad{color:var(--red);background:var(--red-soft);border-color:#fecaca}
+.pill.bad{color:var(--red);background:var(--red-soft);border-color:#e3cdcd}
 .pill.bad .dot{background:var(--red)}
 
 /* ---------- 布局 ---------- */
@@ -60,7 +87,7 @@ header{
   color:var(--text-2);font-size:13.5px;text-align:left;width:100%;
 }
 .nav-item:hover{background:#f3f4f6;color:var(--text)}
-.nav-item.active{background:var(--primary-soft);color:var(--primary);font-weight:600}
+.nav-item.active{color:var(--ink);font-weight:600;background:var(--paper-2);box-shadow:inset 3px 0 0 var(--ink);border-radius:0}
 .nav-item svg{width:16px;height:16px;flex-shrink:0}
 .sidebar-foot{margin-top:auto;padding:8px 10px;font-size:11.5px;color:var(--text-3);border-top:1px solid var(--border)}
 main{flex:1;overflow-y:auto;padding:20px 24px}
@@ -68,12 +95,11 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
 .tab.active{display:block}
 
 /* ---------- 通用卡片与按钮 ---------- */
-.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow);padding:18px}
 .btn{
   display:inline-flex;align-items:center;justify-content:center;gap:6px;
   padding:7px 16px;border-radius:8px;font-size:13.5px;font-weight:500;
   border:1px solid var(--border-2);background:var(--panel);color:var(--text);
-  transition:all .15s;
 }
 .btn:hover{border-color:var(--primary);color:var(--primary)}
 .btn-primary{background:var(--primary);border-color:var(--primary);color:#fff}
@@ -84,10 +110,10 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
 .hidden{display:none !important}
 .kbpipe-grid{display:grid;grid-template-columns:400px 1fr;gap:18px;align-items:start}
 @media(max-width:960px){.kbpipe-grid{grid-template-columns:1fr}}
-.nav-badge{background:var(--red);color:#fff;font-size:10.5px;line-height:1;padding:3px 6px;border-radius:99px;margin-left:auto}
+.nav-badge{background:var(--red);color:#fff;font-size:10.5px;line-height:1;padding:3px 6px;border-radius:var(--r-xs);margin-left:auto}
 .form-tip{font-size:12.5px;color:var(--text-2);margin:-4px 0 10px;line-height:1.6}
 .ku-meta{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
-.ku-chip{font-size:11.5px;background:var(--primary-soft);color:var(--primary);padding:2px 8px;border-radius:99px}
+.ku-chip{font-size:11.5px;background:var(--primary-soft);color:var(--primary);padding:2px 8px;border-radius:var(--r-xs)}
 .kcheck{display:flex;align-items:center;gap:8px;font-size:12.8px;padding:5px 0;border-bottom:1px dashed var(--border)}
 .kcheck:last-child{border-bottom:none}
 .kcheck .ok{color:var(--green);font-weight:700}
@@ -97,20 +123,20 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
 /* ---------- 课程设计页 ---------- */
 .design-grid{display:grid;grid-template-columns:400px 1fr;gap:18px;align-items:start}
 @media (max-width:1080px){.design-grid{grid-template-columns:1fr}}
-.form-card h2{font-size:15px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
-.form-card h2 .tag{font-size:11px;font-weight:500;color:var(--primary);background:var(--primary-soft);padding:2px 8px;border-radius:99px}
+.form-card h2{font-family:var(--font-serif);font-size:16px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.form-card h2 .tag{font-size:11px;font-weight:500;color:var(--primary);background:var(--primary-soft);padding:2px 8px;border-radius:var(--r-xs)}
 .form-card label{display:block;font-size:13px;color:var(--text-2);margin-bottom:12px}
 .form-card label:last-child{margin-bottom:0}
 .form-card input,.form-card select,.form-card textarea{
   width:100%;margin-top:5px;padding:7px 10px;border:1px solid var(--border-2);border-radius:8px;background:#fff;
   font-size:13.5px;outline:none;transition:border .15s;
 }
-.form-card input:focus,.form-card select:focus,.form-card textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+.form-card input:focus,.form-card select:focus,.form-card textarea:focus{border-color:var(--ink)}
 .form-card textarea{resize:vertical;min-height:56px}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .chips{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
 .chip{
-  font-size:12px;padding:2px 10px;border-radius:99px;border:1px solid var(--border-2);
+  font-size:12px;padding:2px 10px;border-radius:var(--r-xs);border:1px solid var(--border-2);
   color:var(--text-2);background:#fafafa;
 }
 .chip:hover{border-color:var(--primary);color:var(--primary)}
@@ -149,7 +175,7 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
 .stepper li.current .label::after{content:" …";color:var(--primary)}
 .running-note{margin-top:14px;font-size:12.5px;color:var(--text-3);border-top:1px dashed var(--border);padding-top:10px}
 
-.human-head{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600;color:var(--amber);margin-bottom:6px}
+.human-head{display:flex;align-items:center;gap:8px;font-family:var(--font-serif);font-size:16px;font-weight:600;color:var(--seal);margin-bottom:8px;padding-left:10px;border-left:3px solid var(--seal)}
 .human-sub{font-size:13px;color:var(--text-2);margin-bottom:14px}
 .human-body{margin-bottom:14px}
 .human-body table{width:100%;border-collapse:collapse;font-size:12.8px;margin:8px 0}
@@ -157,8 +183,8 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
 .human-body th{background:#f9fafb;font-weight:600;white-space:nowrap}
 .issue-list{list-style:none;display:flex;flex-direction:column;gap:6px;margin:8px 0}
 .issue-list li{
-  background:var(--amber-soft);border:1px solid #fde68a;border-radius:8px;
-  padding:8px 12px;font-size:13px;color:#92400e;
+  background:var(--amber-soft);border:1px solid #e8dcb8;border-radius:8px;
+  padding:8px 12px;font-size:13px;color:#7a5e18;
 }
 .human-actions{display:flex;gap:10px;align-items:flex-start}
 .human-actions textarea{
@@ -171,26 +197,27 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
 .done-head h3{font-size:15px;color:var(--green);display:flex;align-items:center;gap:8px}
 .stat-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
 .stat{
-  flex:1;min-width:100px;background:#f9fafb;border:1px solid var(--border);border-radius:8px;
+  flex:1;min-width:100px;background:var(--paper-2);border:1px solid var(--rule);border-radius:var(--r-sm);
   padding:10px 12px;text-align:center;
 }
-.stat .num{font-size:20px;font-weight:700;color:var(--primary)}
+.stat .num{font-family:var(--font-mono);font-size:19px;font-weight:600;color:var(--ink)}
 .stat .lbl{font-size:12px;color:var(--text-2);margin-top:2px}
 .gate-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
 .gate-badge{
-  font-size:12px;padding:3px 10px;border-radius:99px;display:inline-flex;align-items:center;gap:5px;
-  background:var(--green-soft);color:var(--green);border:1px solid #a7f3d0;
+  font-size:12px;padding:3px 10px;border-radius:var(--r-xs);display:inline-flex;align-items:center;gap:5px;
+  background:var(--green-soft);color:var(--green);border:1px solid #c9dbd0;
 }
-.gate-badge.fail{background:var(--red-soft);color:var(--red);border-color:#fecaca}
+.gate-badge.fail{background:var(--red-soft);color:var(--red);border-color:#e3cdcd}
 
 /* Markdown 渲染（课程包） */
 .md-paper{
-  border:1px solid var(--border);border-radius:8px;background:#fff;
-  padding:26px 30px;font-size:13.5px;line-height:1.75;max-height:640px;overflow-y:auto;
+  border:1px solid var(--border);border-radius:var(--r-md);background:var(--paper);
+  padding:28px 34px;font-size:14px;line-height:1.8;max-height:640px;overflow-y:auto;
+  font-family:var(--font-serif);
 }
-.md-paper h1{font-size:19px;margin:0 0 12px;padding-bottom:10px;border-bottom:2px solid var(--primary-soft)}
-.md-paper h2{font-size:15.5px;margin:22px 0 10px;padding-left:9px;border-left:3px solid var(--primary)}
-.md-paper h3{font-size:14px;margin:16px 0 8px;color:var(--primary-hover)}
+.md-paper h1{font-family:var(--font-serif);font-size:22px;font-weight:600;margin:0 0 14px;padding-bottom:10px;border-bottom:1.5px solid var(--rule-2)}
+.md-paper h2{font-family:var(--font-serif);font-size:17px;font-weight:600;margin:24px 0 10px;padding-left:10px;border-left:2px solid var(--ink)}
+.md-paper h3{font-family:var(--font-serif);font-size:15px;font-weight:600;margin:18px 0 8px;color:var(--ink)}
 .md-paper p{margin:8px 0}
 .md-paper ul,.md-paper ol{margin:8px 0 8px 20px}
 .md-paper li{margin:3px 0}
@@ -201,49 +228,54 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
 .md-paper tr:nth-child(even) td{background:#fafafa}
 .md-paper hr{border:none;border-top:1px solid var(--border);margin:16px 0}
 .md-paper code{background:#f3f4f6;border-radius:4px;padding:1px 5px;font-size:12px;font-family:ui-monospace,Consolas,monospace}
-.md-paper strong{color:#111827}
-.md-paper blockquote{border-left:3px solid var(--amber);background:var(--amber-soft);padding:8px 14px;margin:10px 0;border-radius:0 8px 8px 0;color:#92400e}
+.md-paper strong{color:var(--text);font-weight:600}
+.md-paper blockquote{border-left:2px solid var(--rule-2);background:var(--paper-2);padding:10px 16px;margin:12px 0;border-radius:0 var(--r-sm) var(--r-sm) 0;color:var(--text-2);font-size:13.5px}
 
 /* ---------- 知识库页 ---------- */
 .kb-bar{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
 .kb-bar input{
   flex:1;min-width:240px;padding:8px 12px;border:1px solid var(--border-2);border-radius:8px;font-size:13.5px;outline:none;
 }
-.kb-bar input:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+.kb-bar input:focus{border-color:var(--ink)}
 .kb-bar select{padding:8px 10px;border:1px solid var(--border-2);border-radius:8px;font-size:13px;background:#fff;outline:none}
 .kb-count{font-size:12.5px;color:var(--text-3);margin-left:auto}
+/* J 项：状态圆点（替代勾/叉符号）。display:inline-block 必写——span 是行内元素，
+   漏写会导致圆点完全不显示，而 node --check 与任何静态检查都发现不了。 */
+.sdot{display:inline-block;width:7px;height:7px;border-radius:50%;flex:none;vertical-align:middle;background:var(--text-3)}
+.sdot.ok{background:var(--verde)}
+.sdot.err{background:var(--brick)}
 .kb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
-.unit-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;display:flex;flex-direction:column;gap:8px}
+.unit-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow);padding:16px;display:flex;flex-direction:column;gap:8px}
 .unit-card .u-head{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
 .unit-card .u-title{font-size:14px;font-weight:600;line-height:1.4}
 .unit-card .u-id{font-size:11px;color:var(--text-3);font-family:ui-monospace,Consolas,monospace;white-space:nowrap}
-.badge{font-size:11px;padding:2px 8px;border-radius:99px;font-weight:500;white-space:nowrap}
+.badge{font-size:11px;padding:2px 8px;border-radius:var(--r-xs);font-weight:500;white-space:nowrap}
 .badge-a{background:var(--green-soft);color:var(--green)}
 .badge-b{background:var(--blue-soft);color:var(--blue)}
 .badge-c{background:var(--amber-soft);color:var(--amber)}
-.badge-contested{background:#fdf2f8;color:#be185d;border:1px solid #fbcfe8}
+.badge-contested{background:#f8f1f4;color:#8f3455;border:1px solid #e5d2d8}
 .u-tags{display:flex;flex-wrap:wrap;gap:5px}
-.u-tag{font-size:11px;padding:1px 8px;border-radius:99px;background:#f3f4f6;color:var(--text-2);border:1px solid var(--border)}
-.u-tag.domain{background:var(--primary-soft);color:var(--primary);border-color:#c7d2fe}
-.u-tag.lineage{background:#ecfeff;color:#0e7490;border-color:#a5f3fc}
+.u-tag{font-size:11px;padding:1px 8px;border-radius:var(--r-xs);background:#f3f4f6;color:var(--text-2);border:1px solid var(--border)}
+.u-tag.domain{background:var(--primary-soft);color:var(--primary);border-color:#ccd6e0}
+.u-tag.lineage{background:#eef3f5;color:#3d6672;border-color:#c5dfe3}
 /* 学派演进图谱 */
 .kb-graph{overflow-x:auto;padding:6px 0 18px}
 .kb-graph svg{display:block}
 .g-caption{font-size:13px;color:var(--text-2);margin:4px 2px 12px;line-height:1.6}
-.g-era{font-size:10px;fill:#94a3b8}
-.g-name{font-size:12px;font-weight:700;fill:#1e293b}
-.g-count{font-size:10px;fill:#64748b}
-.g-chip{font-size:11px;fill:#334155}
-.chip{cursor:pointer}
-.chip:hover rect{stroke:#6366f1;stroke-width:1.5;fill:#eef2ff}
+.g-era{font-size:10px;fill:#948f85}
+.g-name{font-size:12px;font-weight:700;fill:#22201d}
+.g-count{font-size:10px;fill:#6b675f}
+.g-chip{font-size:11px;fill:#3f3b36}
+.gnode{cursor:pointer}
+.gnode:hover rect{stroke:var(--ink);stroke-width:1.5;fill:var(--ink-soft)}
 .g-legend{font-size:12px;color:var(--text-2);margin-top:10px;display:flex;align-items:center;gap:4px;flex-wrap:wrap}
 .g-legend .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin:0 4px 0 10px}
 #kb-view-toggle{white-space:nowrap}
-.u-source{font-size:12px;color:var(--text-2);background:#f9fafb;border-left:3px solid var(--border-2);padding:5px 10px;border-radius:0 6px 6px 0}
+.u-source{font-family:var(--font-serif);font-size:12.5px;color:var(--text-2);background:var(--paper-2);border-left:2px solid var(--seal);padding:6px 11px;border-radius:0 var(--r-sm) var(--r-sm) 0;line-height:1.6}
 .u-points{list-style:none;font-size:12.8px;display:flex;flex-direction:column;gap:4px}
 .u-points li{padding-left:14px;position:relative}
 .u-points li::before{content:"";position:absolute;left:2px;top:9px;width:5px;height:5px;border-radius:50%;background:var(--primary)}
-.u-mis{background:var(--red-soft);border:1px solid #fecaca;border-radius:8px;padding:8px 12px;font-size:12.5px;color:#991b1b}
+.u-mis{background:var(--red-soft);border:1px solid #e3cdcd;border-radius:8px;padding:8px 12px;font-size:12.5px;color:#7d2a2a}
 .u-mis .t{font-weight:600;margin-bottom:2px}
 .kb-empty{grid-column:1/-1;text-align:center;color:var(--text-2);padding:50px 0}
 
@@ -252,7 +284,7 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
 .graph-box{margin-top:auto;border-top:1px dashed var(--border);padding-top:8px}
 .graph-toggle{
   display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--primary);
-  background:none;border:1px dashed var(--border-2);border-radius:99px;padding:3px 11px;cursor:pointer;
+  background:none;border:1px dashed var(--border-2);border-radius:var(--r-xs);padding:3px 11px;cursor:pointer;
   transition:border .15s,background .15s;
 }
 .graph-toggle:hover{border-color:var(--primary);background:var(--primary-soft)}
@@ -265,14 +297,14 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
 .g-label{flex:none;width:62px;font-size:11.5px;color:var(--text-3);text-align:right}
 .g-items{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
 .g-chip{
-  font-size:11.5px;padding:1px 9px;border-radius:99px;background:#f3f4f6;color:var(--text-2);
+  font-size:11.5px;padding:1px 9px;border-radius:var(--r-xs);background:#f3f4f6;color:var(--text-2);
   border:1px solid var(--border);
 }
-.g-chip.ku{font-family:ui-monospace,Consolas,monospace;background:var(--primary-soft);color:var(--primary);border-color:#c7d2fe;cursor:pointer}
-.g-chip.ku:hover{background:#c7d2fe}
-.g-chip.contested{background:#fdf2f8;color:#be185d;border-color:#fbcfe8}
-.g-chip.case{font-family:ui-monospace,Consolas,monospace;background:var(--green-soft);color:var(--green);border-color:#a7f3d0;cursor:pointer}
-.g-chip.case:hover{background:#a7f3d0}
+.g-chip.ku{font-family:ui-monospace,Consolas,monospace;background:var(--primary-soft);color:var(--primary);border-color:#ccd6e0;cursor:pointer}
+.g-chip.ku:hover{background:#ccd6e0}
+.g-chip.contested{background:#f8f1f4;color:#8f3455;border-color:#e5d2d8}
+.g-chip.case{font-family:ui-monospace,Consolas,monospace;background:var(--green-soft);color:var(--green);border-color:#c9dbd0;cursor:pointer}
+.g-chip.case:hover{background:#c9dbd0}
 .g-arrow{color:var(--text-3);font-size:11px}
 .g-none{color:var(--text-3);font-size:12px}
 .g-loading{color:var(--text-3);font-size:12px;display:flex;align-items:center;gap:6px}
@@ -286,7 +318,7 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
 .runs-table th{font-size:12px;color:var(--text-2);font-weight:600;background:#f9fafb}
 .runs-table tbody tr{cursor:pointer}
 .runs-table tbody tr:hover{background:var(--primary-soft)}
-.status-badge{font-size:11.5px;padding:2px 9px;border-radius:99px;font-weight:500}
+.status-badge{font-size:11.5px;padding:2px 9px;border-radius:var(--r-xs);font-weight:500}
 .st-completed{background:var(--green-soft);color:var(--green)}
 .st-awaiting_human,.st-running,.st-created{background:var(--amber-soft);color:var(--amber)}
 .st-failed{background:var(--red-soft);color:var(--red)}
@@ -296,18 +328,18 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
 
 /* ---------- 连接失败横幅 ---------- */
 #api-banner{
-  display:none;background:var(--red-soft);border:1px solid #fecaca;color:#991b1b;
+  display:none;background:var(--red-soft);border:1px solid #e3cdcd;color:#7d2a2a;
   padding:9px 16px;font-size:13px;border-radius:8px;margin-bottom:14px;
   align-items:center;gap:10px;flex-wrap:wrap;
 }
-#api-banner input{padding:4px 8px;border:1px solid #fecaca;border-radius:6px;font-size:12.5px;width:220px;background:#fff}
+#api-banner input{padding:4px 8px;border:1px solid #e3cdcd;border-radius:6px;font-size:12.5px;width:220px;background:#fff}
 #api-banner .btn-sm{padding:3px 10px}
 #key-banner{
-  display:none;background:#fffbeb;border:1px solid #fde68a;color:#92400e;
+  display:none;background:#fffbeb;border:1px solid #e8dcb8;color:#7a5e18;
   padding:9px 16px;font-size:13px;border-radius:8px;margin-bottom:14px;
   align-items:center;gap:10px;flex-wrap:wrap;
 }
-#key-banner input{padding:4px 8px;border:1px solid #fde68a;border-radius:6px;font-size:12.5px;width:220px;background:#fff}
+#key-banner input{padding:4px 8px;border:1px solid #e8dcb8;border-radius:6px;font-size:12.5px;width:220px;background:#fff}
 #key-banner .btn-sm{padding:3px 10px}
 </style>
 </head>
@@ -326,7 +358,7 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
 
 <div class="layout">
   <nav class="sidebar">
-    <button class="nav-item active" data-tab="design">
+    <button class="nav-item active" data-tab="design" aria-current="page">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h6"/></svg>
       课程设计
     </button>
@@ -351,14 +383,14 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
   </nav>
 
   <main>
-    <div id="api-banner">
-      <span>⚠ 无法连接 API 服务</span>
+    <div id="api-banner" role="alert">
+      <span>无法连接 API 服务</span>
       <input id="api-base-input" placeholder="http://127.0.0.1:8000" value="http://127.0.0.1:8000">
       <button class="btn btn-sm" id="api-base-save">连接</button>
       <span style="font-size:12px">请先在 backend 目录启动：uvicorn app.api.main:app</span>
     </div>
-    <div id="key-banner">
-      <span>🔑 服务已启用 API Key 鉴权</span>
+    <div id="key-banner" role="alert">
+      <span>服务已启用 API Key 鉴权</span>
       <input id="api-key-input" type="password" placeholder="粘贴服务端配置的 API_KEY">
       <button class="btn btn-sm" id="api-key-save">连接</button>
       <span style="font-size:12px">本地开发未设 API_KEY 时不会出现此条；填一次即记住（ localStorage ）</span>
@@ -437,19 +469,19 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
           </div>
 
           <div id="res-human" class="card hidden">
-            <div class="human-head">⚠ 人工审核点</div>
+            <div class="human-head">人工审核点</div>
             <div class="human-sub" id="human-sub"></div>
             <div class="human-body" id="human-body"></div>
             <textarea id="feedback" class="hidden" rows="3" placeholder="请描述需要修正的问题（将作为质量门禁/模块规划的修正反馈）"></textarea>
             <div class="human-actions">
-              <button class="btn btn-primary" id="btn-approve">✓ 批准，继续</button>
+              <button class="btn btn-primary" id="btn-approve">批准，继续</button>
               <button class="btn btn-danger" id="btn-revise">↩ 打回修改</button>
             </div>
           </div>
 
           <div id="res-done" class="card hidden">
             <div class="done-head">
-              <h3>✓ 课程包已生成</h3>
+              <h3>课程包已生成</h3>
               <div>
                 <button class="btn btn-sm" id="btn-again">重新生成</button>
                 <button class="btn btn-sm btn-primary" id="btn-download">下载 Markdown</button>
@@ -461,7 +493,7 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
           </div>
 
           <div id="res-failed" class="card hidden">
-            <h3 style="color:var(--red);margin-bottom:8px">✗ 流水线失败</h3>
+            <h3 style="color:var(--red);margin-bottom:8px">流水线失败</h3>
             <div id="failed-detail" style="font-size:13px;color:var(--text-2);white-space:pre-wrap"></div>
             <div style="margin-top:12px"><button class="btn btn-sm" id="btn-retry">重试</button></div>
           </div>
@@ -472,7 +504,7 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
     <!-- ============ Tab 2：知识库 ============ -->
     <section id="tab-kb" class="tab">
       <div class="card kb-bar">
-        <input id="kb-q" placeholder="搜索知识单元：授权、GROW、战略共识、五力…">
+        <input id="kb-q" aria-label="搜索知识单元" placeholder="搜索知识单元：授权、GROW、战略共识、五力…">
         <select id="kb-domain">
           <option value="">全部领域</option>
         </select>
@@ -485,7 +517,7 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
         <select id="kb-lineage">
           <option value="">全部学派谱系</option>
         </select>
-        <button id="kb-view-toggle" class="btn btn-sm" type="button">📊 学派演进图谱</button>
+        <button id="kb-view-toggle" class="btn btn-sm" type="button">学派演进图谱</button>
         <span class="kb-count" id="kb-count"></span>
         <span id="kb-graph-stat"></span>
       </div>
@@ -565,7 +597,7 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
             <div class="human-body" id="kb-review-body"></div>
             <textarea id="kb-note" rows="2" placeholder="审核意见（打回时说明修改要求；批准可留空）"></textarea>
             <div class="human-actions">
-              <button class="btn btn-primary" id="kb-btn-approve">✓ 批准入库</button>
+              <button class="btn btn-primary" id="kb-btn-approve">批准入库</button>
               <button class="btn btn-danger" id="kb-btn-reject">↩ 打回</button>
             </div>
           </div>
@@ -723,9 +755,10 @@ $("api-key-input").addEventListener("keydown", (e) => {
 /* ==================== Tab 切换 ==================== */
 document.querySelectorAll(".nav-item").forEach((btn) => {
   btn.onclick = () => {
-    document.querySelectorAll(".nav-item").forEach((b) => b.classList.remove("active"));
+    document.querySelectorAll(".nav-item").forEach((b) => { b.classList.remove("active"); b.removeAttribute("aria-current"); });
     document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
     btn.classList.add("active");
+    btn.setAttribute("aria-current", "page");
     $("tab-" + btn.dataset.tab).classList.add("active");
     if (btn.dataset.tab === "kb") loadKb();
     if (btn.dataset.tab === "runs") loadRuns();
@@ -759,7 +792,7 @@ async function loadKbPipe() {
   $("kbpipe-empty").classList.toggle("hidden", runs.length > 0);
   $("kbpipe-body").innerHTML = runs.map((r) => {
     const st = statusPill(r.status);
-    const q = r.quality_passed === null ? "-" : (r.quality_passed ? "✓ 通过" : "✗ 未过");
+    const q = r.quality_passed === null ? "-" : (r.quality_passed ? "通过" : "未过");
     return `<tr><td>${esc(r.draft_id || "-")}</td><td>${st}</td><td>${esc(r.title || "-")}</td>` +
       `<td>${esc(r.source || "-")}</td><td>${q}</td><td>${esc(r.committed_unit_id || "-")}</td>` +
       `<td>${esc(r.updated_at || "")}</td></tr>`;
@@ -772,14 +805,23 @@ async function loadKbPipe() {
     `<td>${esc(c.copyright_status)}</td><td>${esc(c.status)}</td><td>${esc(c.text_preview)}…</td></tr>`).join("");
 }
 
+/* 状态文案单一数据源：确保全站同一概念同一叫法（术语不一致比 emoji 更像 AI）。
+   运行记录表格与流水线状态徽标共用此表，避免两套映射漂移。 */
+const STATUS_CN = {
+  created: "已创建", running: "执行中", awaiting_human: "待人工审核",
+  completed: "已完成", committed: "已入库", rejected: "已打回",
+  failed: "失败", validated: "质检通过",
+};
+const STATUS_PILL_CLS = {
+  awaiting_human: "pill", created: "pill", running: "pill",
+  committed: "pill ok", completed: "pill ok", validated: "pill ok",
+  rejected: "pill bad", failed: "pill bad",
+};
+
 function statusPill(status) {
-  const map = {
-    awaiting_human: ["待审核", "pill"], committed: ["已入库", "pill ok"],
-    rejected: ["已打回", "pill bad"], failed: ["失败", "pill bad"],
-    validated: ["质检通过", "pill ok"],
-  };
-  const [label, cls] = map[status] || [status || "-", "pill"];
-  return `<span class="${cls}"><span class="dot"></span>${label}</span>`;
+  const label = STATUS_CN[status] || status || "-";
+  const cls = STATUS_PILL_CLS[status] || "pill";
+  return `<span class="${cls}"><span class="dot"></span>${esc(label)}</span>`;
 }
 
 $("corpus-form").onsubmit = async (e) => {
@@ -803,7 +845,7 @@ $("corpus-form").onsubmit = async (e) => {
     })).json();
     kbCurrentRun = j;
     if (j.status === "failed") {
-      $("kb-done-title").textContent = "✗ 流水线执行失败";
+      $("kb-done-title").textContent = "流水线执行失败";
       $("kb-done-md").innerHTML = `<p>${esc(j.detail?.error || "未知错误")}</p>`;
       showKb("kb-done");
       return;
@@ -811,7 +853,7 @@ $("corpus-form").onsubmit = async (e) => {
     renderKbReview(j);
     loadKbPipe();
   } catch (err) {
-    $("kb-done-title").textContent = "✗ 提交失败";
+    $("kb-done-title").textContent = "提交失败";
     $("kb-done-md").innerHTML = `<p>${esc(err.message)}</p>`;
     showKb("kb-done");
   }
@@ -827,16 +869,16 @@ function renderKbReview(j) {
   }
   if (j.status === "rejected") {
     const failed = (j.quality?.checks || []).filter((c) => !c.passed);
-    $("kb-done-title").textContent = "✗ 质检未通过，已自动打回";
+    $("kb-done-title").textContent = "质检未通过，已自动打回";
     $("kb-done-md").innerHTML =
       `<p>草稿 <b>${esc(d.id)}</b> 未通过质检，未进入人工审核：</p>` +
-      failed.map((c) => `<div class="kcheck"><span class="bad">✗</span><b>${esc(c.code)} ${esc(c.name)}</b><span class="kdetail">${esc(c.detail)}</span></div>`).join("") +
+      failed.map((c) => `<div class="kcheck"><span class="bad">未通过</span><b>${esc(c.code)} ${esc(c.name)}</b><span class="kdetail">${esc(c.detail)}</span></div>`).join("") +
       `<p style="margin-top:8px;font-size:12.5px;color:var(--text-2)">请补充语料信息或修正后重新提交。</p>`;
     showKb("kb-done");
     return;
   }
   if (j.status !== "awaiting_human") {
-    $("kb-done-title").textContent = j.status === "committed" ? "✓ 已入库" : "流水线已结束";
+    $("kb-done-title").textContent = j.status === "committed" ? "已入库" : "流水线已结束";
     $("kb-done-md").innerHTML = `<p>${esc(j.committed_unit_id || "")}</p>`;
     showKb("kb-done");
     return;
@@ -844,7 +886,7 @@ function renderKbReview(j) {
   const u = d.unit;
   $("kb-review-sub").textContent = `草稿 ${d.id} ｜ 语料 ${(d.corpus_ids || []).join(", ")}`;
   const checks = (d.quality?.checks || []).map((c) =>
-    `<div class="kcheck"><span class="${c.passed ? "ok" : "bad"}">${c.passed ? "✓" : "✗"}</span>` +
+    `<div class="kcheck"><span class="${c.passed ? "ok" : "bad"}">${c.passed ? "通过" : "未通过"}</span>` +
     `<b>${esc(c.code)} ${esc(c.name)}</b><span class="kdetail">${esc(c.detail)}</span></div>`).join("");
   $("kb-review-body").innerHTML =
     `<h4 style="margin:4px 0">${esc(u.title)}</h4>` +
@@ -869,20 +911,20 @@ async function kbDecide(action) {
       body: JSON.stringify({ action, note, reviewer: "web-reviewer" }),
     })).json();
     if (j.status === "committed") {
-      $("kb-done-title").textContent = `✓ 已批准入库：${j.committed_unit_id}`;
+      $("kb-done-title").textContent = `已批准入库：${j.committed_unit_id}`;
       $("kb-done-md").innerHTML = `<p>知识单元 <b>${esc(j.committed_unit_id)}</b> 已写入知识库，检索与课程生成立即可用。</p>`;
     } else if (j.status === "rejected") {
       $("kb-done-title").textContent = "↩ 已打回";
       $("kb-done-md").innerHTML = `<p>草稿已标记打回${note ? `，意见：${esc(note)}` : ""}。</p>`;
     } else {
-      $("kb-done-title").textContent = j.status === "failed" ? "✗ 执行失败" : "流水线已结束";
+      $("kb-done-title").textContent = j.status === "failed" ? "执行失败" : "流水线已结束";
       $("kb-done-md").innerHTML = `<p>${esc(j.detail?.error || j.status)}</p>`;
     }
     showKb("kb-done");
     loadKbPipe();
     refreshConn();
   } catch (err) {
-    $("kb-done-title").textContent = "✗ 操作失败";
+    $("kb-done-title").textContent = "操作失败";
     $("kb-done-md").innerHTML = `<p>${esc(err.message)}</p>`;
     showKb("kb-done");
   }
@@ -993,7 +1035,7 @@ function renderStepper(statusField) {
   const idx = STAGE_MAP[statusField] || 0;
   $("stepper").innerHTML = STAGES.map((s, n) => {
     const cls = n < idx ? "done" : n === idx ? "current" : "";
-    const mark = n < idx ? "✓" : n + 1;
+    const mark = n < idx ? "" : n + 1;
     return `<li class="${cls}"><span class="node">${mark}</span><span class="label">${esc(s)}</span></li>`;
   }).join("");
 }
@@ -1070,7 +1112,7 @@ async function showDone(runId) {
   $("done-stats").innerHTML = ["模块", "活动", "评估题", "引用", "Token"].map((l, n) =>
     `<div class="stat"><div class="num">${esc(String(n === 4 ? toks : all[n]))}</div><div class="lbl">${l}</div></div>`).join("");
   const gates = (pkg.gates || []).map((g) =>
-    `<span class="gate-badge ${g.passed ? "" : "fail"}">${g.passed ? "✓" : "✗"} ${esc(g.gate || "")}</span>`).join("");
+    `<span class="gate-badge ${g.passed ? "" : "fail"}"><i class="sdot ${g.passed ? "ok" : "err"}"></i>${g.passed ? "通过" : "未通过"} · ${esc(g.gate || "")}</span>`).join("");
   $("done-gates").innerHTML = gates || '<span style="font-size:12.5px;color:var(--text-3)">门禁报告见课程包</span>';
   $("md-view").innerHTML = renderMarkdown(md);
   show("res-done");
@@ -1198,15 +1240,32 @@ const LINEAGE_ORDER = [
 ];
 const LINEAGE_PALETTE = {
   "L-CLASSIC": "#8b5cf6", "L-BEHAV": "#0ea5e9", "L-DECISION": "#14b8a6",
-  "L-QUALITY": "#f59e0b", "L-CONTINGENCY": "#ef4444", "L-STRATEGY": "#6366f1",
+  "L-QUALITY": "#f59e0b", "L-CONTINGENCY": "#ef4444", "L-STRATEGY": "#2b4c6f",
   "L-ORGLEARN": "#10b981", "L-LEADERSHIP": "#ec4899", "L-CHINA": "#d97706",
 };
 let kbView = "grid";
+
+/* E 项：Esc 关闭浮层 / 从图谱视图退回卡片检索。
+   N1 边界：本项目 22 个表单控件属录入密集，输入框聚焦时不拦截 Esc，
+   避免打断未保存的表单录入。同理，绝不劫持裸 ←/→（它们是光标移动刚需）。 */
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  const t = e.target;
+  if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+  if (kbView === "graph") { $("kb-view-toggle").click(); return; }
+  document.querySelectorAll(".graph-body.show").forEach((b) => {
+    b.classList.remove("show");
+    const btn = b.previousElementSibling;
+    const arrow = btn && btn.querySelector(".arrow");
+    if (arrow) arrow.textContent = "▶";
+  });
+});
+
 function trunc(s, n) { s = (s || ""); return s.length > n ? s.slice(0, n) + "…" : s; }
 function filterByLineage(code) {
   $("kb-lineage").value = code;
   kbView = "grid";
-  $("kb-view-toggle").textContent = "📊 学派演进图谱";
+  $("kb-view-toggle").textContent = "学派演进图谱";
   loadKb();
 }
 
@@ -1255,16 +1314,16 @@ async function loadKb() {
       </div>
       <div class="u-tags">
         <span class="badge badge-${(u.evidence_level || "B").toLowerCase()}">${evName[u.evidence_level] || u.evidence_level}</span>
-        ${u.contested ? '<span class="badge badge-contested">⚔ 学派争议</span>' : ""}
+        ${u.contested ? '<span class="badge badge-contested">学派争议</span>' : ""}
         ${(u.domains || []).map((d) => `<span class="u-tag domain">${esc(DOMAIN_NAMES[d] || d)}</span>`).join("")}
         ${(u.lineage || []).map((d) => `<span class="u-tag lineage">${esc(LINEAGE_NAMES[d] || d)}</span>`).join("")}
         ${(u.dilemmas || []).map((d) => `<span class="u-tag">${esc(d)}</span>`).join("")}
       </div>
-      <div class="u-source">📖 ${esc(u.source)}</div>
+      <div class="u-source">${esc(u.source)}</div>
       <ul class="u-points">${(u.key_points || []).map((p) => `<li>${esc(p)}</li>`).join("")}</ul>
-      ${(u.misconceptions || []).length ? `<div class="u-mis"><div class="t">⚠ 学员常见误区</div>${u.misconceptions.map((m) => `<div>${esc(m)}</div>`).join("")}</div>` : ""}
+      ${(u.misconceptions || []).length ? `<div class="u-mis"><div class="t">学员常见误区</div>${u.misconceptions.map((m) => `<div>${esc(m)}</div>`).join("")}</div>` : ""}
       ${graphEnabled ? `<div class="graph-box">
-        <button class="graph-toggle" type="button" data-uid="${esc(u.id)}">🕸 图谱关系 <span class="arrow">▶</span></button>
+        <button class="graph-toggle" type="button" data-uid="${esc(u.id)}">图谱关系 <span class="arrow">▶</span></button>
         <div class="graph-body"></div>
       </div>` : ""}
     </div>`).join("");
@@ -1293,7 +1352,7 @@ async function renderKbGraph() {
   order.forEach((c, i) => {
     const x0 = padX + i * (colW + gapX);
     const cx = x0 + colW / 2;
-    const color = LINEAGE_PALETTE[c] || "#6366f1";
+    const color = LINEAGE_PALETTE[c] || "#2b4c6f";
     const m = meta[c];
     const cnt = (byLineage[c] || []).length;
     if (i > 0) {
@@ -1307,7 +1366,7 @@ async function renderKbGraph() {
     (byLineage[c] || []).forEach((u, idx) => {
       const cy = colTop + idx * (chipH + chipGap);
       const ev = evColor[u.evidence_level] || "#888";
-      chips += `<g class="chip" onclick="filterByLineage('${c}')">`
+      chips += `<g class="gnode" onclick="filterByLineage('${c}')">`
         + `<title>${esc(u.title)}（${esc(u.id)}）· 点击按该学派筛选</title>`
         + `<rect x="${x0}" y="${cy}" width="${colW}" height="${chipH}" rx="6" fill="#ffffff" stroke="#e5e7eb"/>`
         + `<circle cx="${x0 + 12}" cy="${cy + chipH / 2}" r="4" fill="${ev}"/>`
@@ -1333,7 +1392,7 @@ $("kb-evidence").onchange = loadKb;
 $("kb-lineage").onchange = loadKb;
 $("kb-view-toggle").onclick = () => {
   kbView = (kbView === "grid") ? "graph" : "grid";
-  $("kb-view-toggle").textContent = (kbView === "graph") ? "🔍 卡片检索" : "📊 学派演进图谱";
+  $("kb-view-toggle").textContent = (kbView === "graph") ? "卡片检索" : "学派演进图谱";
   $("kb-grid").classList.toggle("hidden", kbView === "graph");
   $("kb-graph").classList.toggle("hidden", kbView !== "graph");
   if (kbView === "graph") renderKbGraph(); else loadKb();
@@ -1356,7 +1415,7 @@ async function loadGraphStats() {
     graphMode = j.graph_mode || "none";
     graphStatsLoaded = true;
     $("kb-graph-stat").textContent = graphEnabled
-      ? `🕸 图谱（${graphMode}）：${j.ku_nodes ?? 0} 单元 · ${j.person_nodes ?? 0} 学者 · ${j.view_nodes ?? 0} 观点 · ${j.relations ?? 0} 边`
+      ? `图谱（${graphMode}）：${j.ku_nodes ?? 0} 单元 · ${j.person_nodes ?? 0} 学者 · ${j.view_nodes ?? 0} 观点 · ${j.relations ?? 0} 边`
       : "";
   } catch (_) {
     graphEnabled = false;
@@ -1486,7 +1545,7 @@ async function loadRuns() {
   $("runs-body").innerHTML = runs.map((r) => `
     <tr data-run="${esc(r.run_id)}">
       <td style="font-family:ui-monospace,Consolas,monospace;font-size:12px">${esc(r.run_id)}</td>
-      <td><span class="status-badge st-${esc(r.status || "")}">${esc(r.status || "")}</span></td>
+      <td><span class="status-badge st-${esc(r.status || "")}">${esc(STATUS_CN[r.status] || r.status || "-")}</span></td>
       <td>${esc(r.audience || "-")}</td>
       <td>${r.duration_minutes ? esc(String(Math.round(r.duration_minutes / 60 * 10) / 10)) + " 小时" : "-"}</td>
       <td>${esc(r.industry || "-")}</td>
@@ -1530,7 +1589,7 @@ async function loadTokens() {
     const t = r.tokens || {};
     return `<tr>
       <td style="font-family:ui-monospace,Consolas,monospace;font-size:12px">${esc(r.run_id)}</td>
-      <td><span class="status-badge st-${esc(r.status || "")}">${esc(r.status || "")}</span></td>
+      <td><span class="status-badge st-${esc(r.status || "")}">${esc(STATUS_CN[r.status] || r.status || "-")}</span></td>
       <td>${esc(r.audience || "-")}</td>
       <td style="text-align:right;font-family:ui-monospace,Consolas,monospace;font-size:12px">${esc(String(t.prompt_tokens ?? 0))}</td>
       <td style="text-align:right;font-family:ui-monospace,Consolas,monospace;font-size:12px">${esc(String(t.completion_tokens ?? 0))}</td>
