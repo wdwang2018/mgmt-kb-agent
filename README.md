@@ -54,13 +54,13 @@ mgmt-kb-agent/
 │   ├── app/
 │   │   ├── domain/            # 领域内核：constants（六域×L1-L5、24 困境）、models（pydantic）
 │   │   │   └── schemas/       # 导出的 JSON Schema（三个核心工件）
-│   │   ├── ports.py           # 端口协议（LLM/检索/知识库）
-│   │   ├── adapters/          # Mock/DeepSeek/GLM LLM、内存检索、JSON 知识库、JSON 语料层
-│   │   ├── graph/             # 九节点(课程设计) + 五节点(知识流水线) + 四门禁/五质检 + HITL
+│   │   ├── ports.py           # 端口协议（LLM/检索/知识库/嵌入/图谱/元数据）
+│   │   ├── adapters/          # Mock/DeepSeek/GLM LLM、内存/Milvus/混合检索、JSON 知识库、JSON 语料层、Kùzu 图谱、PG 元数据
+│   │   ├── graph/             # 九节点(课程设计) + 五节点(知识流水线) + 四门禁/五质检 + HITL + checkpoint 工厂（sqlite 持久化）
 │   │   ├── services/          # 课程设计流水线 + 知识流水线 + 渲染 + 组合根
-│   │   └── api/               # FastAPI 路由（含 kb 流水线端点）
+│   │   └── api/               # FastAPI 路由（含 kb 流水线端点）+ security.py（P0 安全中间件）
 │   ├── scripts/               # run_demo / export_schemas / probe_langgraph
-│   └── tests/                 # 58 个测试（门禁/检索/原型/流水线/API/LLM 输出形状/知识流水线）
+│   └── tests/                 # 136 个测试（门禁/检索/原型/流水线/API/LLM 输出形状/知识流水线/安全/检查点）
 ├── knowledge/
 │   ├── units/                 # 知识单元（JSONL；lead_draft/strat_draft 为流水线入库文件）
 │   ├── corpus/                # L1 语料层（带页码定位，CC 编号）
@@ -72,6 +72,8 @@ mgmt-kb-agent/
 │   └── run_eval.py            # 评测脚本 → report-<日期>.md
 ├── web/                       # Web 工作台（单页应用，FastAPI 静态挂载）
 │   └── index.html             # 课程设计 / 知识库 / 运行记录 / 知识流水线 四个页签
+├── .github/workflows/ci.yml   # CI：pytest + 黄金评测 +（配了 Hook 才执行）Render 自动部署
+├── render.yaml                # Render 部署蓝图（Blueprint 一键部署）
 ├── requirements.txt
 └── runs/                      # 运行产物（课程包 + kb-runs 草稿记录；已 gitignore）
 ```
@@ -375,6 +377,7 @@ curl localhost:8932/api/v1/kb/graph-stats            # 节点与关系边规模
 |---|---|---|
 | `knowledge/*.jsonl`（26 单元 + 案例） | ✅ 保留 | 在 git 仓库，随镜像部署 |
 | `milvus_kb.db` / `*.kuzu` | ⚠️ 重置 | 派生索引，启动时由 JSONL 自动重建（MERGE 幂等） |
+| `checkpoints.db`（进行中的会话） | ⚠️ 重置 | 重启丢会话；但免费计划本身就会周期性重启，跨重启续会话需持久磁盘或 PG（`CHECKPOINT_MODE=postgres` 预留） |
 | `runs/`（课程包）、流水线审核入库的新单元 | ⚠️ 重置 | **线上定位为只读演示**；生产知识编辑以本地仓库为真相源；后续可接 Render Managed PG（`STORE_MODE=pg` 适配器已就位、未实测） |
 
 **上线步骤**：① Dashboard → New Blueprint 选本仓库 → ② 部署时填 `GLM_API_KEY`（建议同时填 `API_KEY`，见下节）→ ③ 拿到 URL 后验 `/healthz` 应返回 `llm=glm-*`、`vector_mode=hybrid`、`graph_mode=kuzu`（若为 `memory`/`none` 说明可选依赖没装上，已自动降级但功能仍完整）。
@@ -398,15 +401,32 @@ curl localhost:8932/api/v1/kb/graph-stats            # 节点与关系边规模
 | `RATE_LIMIT_KEY` | 300 | 每 API Key 每窗口请求数，0 = 不限 |
 | `RATE_LIMIT_WINDOW` | 60 | 限流窗口秒数；超限返回 429 + `Retry-After` |
 
-要点：① 限流位于 Key 校验外层——**401 请求也计 IP 额度**（防暴力探测），有意为之；② 限流为进程内滑动窗口，单实例够用，多实例共享需 Redis（后续项）；③ Web 工作台收到 401 时弹出琥珀色横幅引导输入 Key，存 `localStorage` 持久化，填一次即记住；④ 测试 15 例（`tests/test_security.py`）含四轮变异验证，pytest 总计 123 全过。
+要点：① 限流位于 Key 校验外层——**401 请求也计 IP 额度**（防暴力探测），有意为之；② 限流为进程内滑动窗口，单实例够用，多实例共享需 Redis（后续项）；③ Web 工作台收到 401 时弹出琥珀色横幅引导输入 Key，存 `localStorage` 持久化，填一次即记住；④ 测试 15 例（`tests/test_security.py`）含四轮变异验证。
+
+### P1 可靠性层（检查点持久化 + CI）
+
+**检查点持久化**（`backend/app/graph/checkpoint.py`）：LangGraph 检查点从 `MemorySaver`（进程内存，重启即丢进行中的会话）切换为嵌入式 SQLite（默认），与 Milvus Lite / Kùzu 同一嵌入式路线——**无服务端、无 Docker、一个文件**：
+
+| 环境变量 | 默认 | 说明 |
+|---|---|---|
+| `CHECKPOINT_MODE` | `sqlite` | `sqlite` = 嵌入式文件（`backend/checkpoints.db`，路径按 `__file__` 相对定位、与 cwd 无关）；`postgres` = 服务端（需配 DSN）；`none` = MemorySaver（仅测试） |
+| `CHECKPOINT_DB_PATH` | `checkpoints.db` | 相对路径一律解析到 `backend/` 下（与 `graph_kb.kuzu` 同目录约定） |
+| `CHECKPOINT_POSTGRES_DSN` | 未设 | `postgres` 模式的连接串；缺失或驱动缺失自动**降级 sqlite** 并在 `/healthz` 的 `checkpoint_note` 暴露原因 |
+
+`/healthz` 新增 `checkpoint_mode` / `checkpoint_note` 两个字段，与既有 vector/graph/store 模式同一风格。**实测（2026-10-17，服务级重启 smoke）**：课程设计跑到 `confirm_targets` 挂起点 → kill 服务 → 重启 → GET 状态仍是 `awaiting_human` → approve 后 `completed`（7 模块/10 活动/10 评估/11 引用）完整产出——MemorySaver 时代重启后 resume 面对空状态，此场景不可能成立。`postgres` 分支为 Render Managed PG 预留（lazy 导入 + 降级链，本轮未实测服务端路径）。
+
+**CI**（`.github/workflows/ci.yml`）：push/PR 触发，两步守质量——① `pytest` 全量（Mock 模式离线确定性，无需 Key）；② 黄金评测七项（完成率或门禁通过率 <100% 时脚本 exit 1，CI 直接红）。`deploy` 任务仅 main 分支 push 且测试通过后执行：读取 `secrets.RENDER_DEPLOY_HOOK` 调 Render Deploy Hook（**未配置该 secret 时自动跳过**，不影响绿灯）——配一次即拥有「测试过才部署」的自动流水线，无需再手动 Deploy。
+
+配置方法：GitHub 仓库 → Settings → Secrets and variables → Actions → New repository secret，名 `RENDER_DEPLOY_HOOK`，值取 Render Dashboard → 服务 → Settings → Deploy Hook 生成的 URL。
 
 ## 路线
 
 - **P1 知识流水线**：✅ 已落地——采集（L1 语料带页码定位）→ 加工（规则/LLM 双模抽取）→ K1-K5 质检 → 人工审核台（Web 第四页签 + API）→ 编号入库即时生效
 - **P1 基础设施·向量检索**：✅ 已落地——`EmbeddingClient` 端口 + Mock/GLM 双 Embedding 适配器 + `MilvusRetriever`（Milvus Lite 本地文件、**无需 Docker**，COSINE 语义召回 + `ARRAY_CONTAINS` 标量过滤 + upsert 幂等）+ `HybridRetriever`（BM25 + 稠密双路召回、RRF 融合、稠密侧加权 2.0）+ `VECTOR_MODE` 三模式切换与自动降级
 - **P1 基础设施·图与持久化**：✅ 已落地——`GraphStore` 端口 + `KuzuGraphStore`（嵌入式、**实测 26 单元建出 103 条关系边**：前置链/提出者/学派/争议/案例查询全通）+ `Neo4jGraphStore`（lazy 占位，Cypher 同构可平移）+ `MetadataStore` 双适配器（JSON 默认 / PG lazy）+ `GRAPH_MODE` / `STORE_MODE` 切换与自动降级；**待实测**：Neo4j 与 PG 真实服务端路径（环境缺 Java/PG）
+- **P1 基础设施·可靠性与 CI**：✅ 已落地——检查点持久化（sqlite 默认 + postgres 预留 + 降级链，重启续会话实测通过）+ GitHub Actions（pytest + 黄金评测 + 可选 Render 自动部署）
 - **P2 培训支撑扩展**：✅ Web 工作台已落地（课程设计/知识库/运行记录/知识流水线四页签）；待做：备课助手、学员导师、案例导演（多角色模拟）；Kirkpatrick L1-L4 回流
-- **P3 闭环运营**：学员画像、学习路径、课程包自动迭代
+- **P3 闭环运营**：学员画像、学习路径、课程包自动迭代；剩余工业级项：多实例限流（Redis）、LLM 故障降级链（GLM→DeepSeek→Mock）、token 计量与结构化日志
 
 ## 约定
 

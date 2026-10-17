@@ -10,38 +10,13 @@ from __future__ import annotations
 
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 
-from ..domain.models import (
-    Activity,
-    AssessmentItem,
-    Bucket,
-    CorpusChunk,
-    CoursePackage,
-    DraftQualityReport,
-    EvidenceLevel,
-    GapAnalysis,
-    GateReport,
-    KnowledgeUnit,
-    KUType,
-    LearningObjective,
-    ModulePlan,
-    QualityCheck,
-    RelationType,
-    TheoryPoint,
-    TrainingNeed,
-    UnitDraft,
-)
+from .checkpoint import domain_serde
 from .knowledge_nodes import KB_NODES, KBNodeDeps, KBState
 
-# 状态携带 pydantic 领域模型，须在 msgpack serde 允许列表中显式登记
-# （KnowledgeUnit 内部的 EvidenceLevel/KUType/RelationType 枚举同样要逐个登记）
-_SERDE = JsonPlusSerializer(allowed_msgpack_modules=[
-    TrainingNeed, GapAnalysis, LearningObjective, ModulePlan,
-    TheoryPoint, Activity, AssessmentItem, GateReport, CoursePackage, Bucket,
-    KnowledgeUnit, CorpusChunk, UnitDraft, DraftQualityReport, QualityCheck,
-    EvidenceLevel, KUType, RelationType,
-])
+# 状态携带 pydantic 领域模型，msgpack serde 允许列表由 checkpoint.domain_serde
+# 统一登记（课程/知识两张图取并集，超集为安全放行）。
+_SERDE = domain_serde()
 
 
 def default_kb_checkpointer():

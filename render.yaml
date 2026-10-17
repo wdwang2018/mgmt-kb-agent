@@ -21,6 +21,10 @@ services:
         value: glm              # GLM embedding-3（2048 维）
       - key: GRAPH_MODE
         value: kuzu             # 嵌入式图库；构造失败自动降级 none（图面板隐藏）
+      # ---- P1 可靠性：检查点持久化 ----
+      - key: CHECKPOINT_MODE
+        value: sqlite           # 默认即 sqlite（嵌入式文件，重启不丢进行中的会话）；
+                                # postgres 需配 CHECKPOINT_POSTGRES_DSN，缺失自动降级 sqlite
       # ---- 敏感项：sync:false 表示不进仓库，部署时在 Dashboard 手填 ----
       - key: GLM_API_KEY
         sync: false

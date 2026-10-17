@@ -52,9 +52,9 @@ class KBResult:
 
 
 class KnowledgePipeline:
-    def __init__(self, deps: KBNodeDeps, runs_dir: str | Path):
+    def __init__(self, deps: KBNodeDeps, runs_dir: str | Path, checkpointer=None):
         self.deps = deps
-        self.graph = build_kb_workflow(deps)
+        self.graph = build_kb_workflow(deps, checkpointer)
         self.runs_dir = Path(runs_dir) / "kb-runs"
         self.runs_dir.mkdir(parents=True, exist_ok=True)
 

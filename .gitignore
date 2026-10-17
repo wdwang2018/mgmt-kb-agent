@@ -11,6 +11,10 @@ milvus_kb.db
 # Kùzu 图库文件（同上，可由 units JSONL 的 relations 字段重建，不入库）
 *.kuzu
 *.kuzu.wal
+# LangGraph 检查点（sqlite 嵌入式文件，会话状态可随内容重建/演示用途，不入库）
+checkpoints.db
+checkpoints.db-wal
+checkpoints.db-shm
 # 环境
 .env
 *.log

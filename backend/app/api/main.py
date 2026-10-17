@@ -74,7 +74,8 @@ def healthz():
             "knowledge_units": len(c.retriever.units),
             "vector_mode": c.vector_mode, "vector_note": c.vector_note,
             "graph_mode": c.graph_mode, "graph_note": c.graph_note,
-            "store_mode": c.store_mode, "store_note": c.store_note}
+            "store_mode": c.store_mode, "store_note": c.store_note,
+            "checkpoint_mode": c.checkpoint_mode, "checkpoint_note": c.checkpoint_note}
 
 
 @app.post("/api/v1/runs")

@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# 同一分支新推送取消进行中的旧运行，省 CI 额度
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: pytest + 黄金评测
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: 安装依赖（含可选增强：milvus-lite / kuzu / checkpoint-sqlite）
+        run: pip install -r requirements.txt
+
+      # Mock LLM 为默认模式，全程离线确定性，无需任何 Key
+      - name: pytest 全量
+        working-directory: backend
+        run: pytest -q
+
+      # 完成率或门禁通过率 < 100% 时脚本 exit 1，CI 直接红
+      - name: 黄金评测七项
+        run: python eval/run_eval.py
+
+  deploy:
+    name: 触发 Render 部署
+    needs: test
+    # 仅 main 分支的 push 触发；PR 与其它分支不部署
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      # Deploy Hook URL 形如 https://api.render.com/deploy/srv-xxxx?key=yyyy，
+      # 任何人拿到都可触发部署，必须放 secret 不放仓库
+      RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+    steps:
+      - name: 调 Deploy Hook（未配置 secret 时自动跳过，不影响 CI 绿灯）
+        if: env.RENDER_DEPLOY_HOOK != ''
+        run: |
+          echo "tests passed, triggering Render deploy…"
+          curl -fsS -m 60 -X POST "$RENDER_DEPLOY_HOOK"

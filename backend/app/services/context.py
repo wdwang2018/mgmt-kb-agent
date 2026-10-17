@@ -11,6 +11,7 @@ from ..adapters.graph_factory import build_graph_store, build_metadata_store
 from ..adapters.kb_json import JsonKnowledgeStore
 from ..adapters.llm_factory import get_llm
 from ..adapters.retriever_factory import get_retriever
+from ..graph.checkpoint import build_checkpointer
 from ..graph.knowledge_nodes import KBNodeDeps
 from ..graph.nodes import NodeDeps
 from ..ports import Retriever
@@ -59,6 +60,8 @@ class AppContext:
     graph_note: str | None = None
     store_mode: str = "json"
     store_note: str | None = None
+    checkpoint_mode: str = "sqlite"     # sqlite / postgres / memory（重启丢会话）
+    checkpoint_note: str | None = None  # 降级原因（正常为 None）
 
     def reindex(self) -> None:
         """知识流水线入库后重建检索索引与知识图谱（适配器原地刷新，引用不变）。
@@ -103,7 +106,10 @@ def build_context(knowledge_dir: str | Path | None = None,
         output_dir=o_dir,
         hitl_mode=hitl_mode,
     )
-    pipeline = CourseDesignPipeline(deps)
+    # 检查点存储：CHECKPOINT_MODE=sqlite（默认，嵌入式文件，重启不丢会话）
+    # / postgres（需 DSN，缺失自动降级）/ none（MemorySaver，仅测试用）
+    checkpointer, cp_mode, cp_note = build_checkpointer()
+    pipeline = CourseDesignPipeline(deps, checkpointer)
     kb_deps = KBNodeDeps(
         llm=deps.llm,
         store=store,
@@ -112,12 +118,13 @@ def build_context(knowledge_dir: str | Path | None = None,
         auto_approve=False,  # Web 审核台走真实人工挂起；Demo/测试用 run_auto
         on_commit=None,      # 占位，装配完成后绑定（闭包引用待创建的 ctx）
     )
-    kb_pipeline = KnowledgePipeline(kb_deps, o_dir)
+    kb_pipeline = KnowledgePipeline(kb_deps, o_dir, checkpointer)
     ctx = AppContext(store=store, corpus_store=corpus_store, retriever=retriever,
                      pipeline=pipeline, kb_pipeline=kb_pipeline,
                      knowledge_dir=k_dir, output_dir=o_dir,
                      vector_mode=vector_mode, vector_note=vector_note,
                      graph=graph, graph_mode=graph_mode, graph_note=graph_note,
-                     store_mode=store_mode, store_note=store_note)
+                     store_mode=store_mode, store_note=store_note,
+                     checkpoint_mode=cp_mode, checkpoint_note=cp_note)
     kb_deps.on_commit = lambda unit_id: ctx.reindex()  # 入库即重索引 + 同步建图
     return ctx
