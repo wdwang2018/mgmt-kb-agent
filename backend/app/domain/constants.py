@@ -160,6 +160,12 @@ THEORY_LINEAGE = {
         "desc": "否认放之四海皆准：领导随准备度而变（Hersey/Blanchard、Fiedler）、路径-目标（House）、组织与环境匹配（Lawrence & Lorsch）、系统观（Katz & Kahn）、管理角色（Mintzberg）。",
         "authors": ["Hersey", "Blanchard", "Fiedler", "House", "Lawrence", "Lorsch", "Mintzberg"],
     },
+    "L-DECISION": {
+        "name": "决策科学学派",
+        "era": "1940s–",
+        "desc": "把管理还原为「在不确定下做选择」：有限理性与满意化（Simon）、组织决策的过程观（Cyert & March）、行为决策与启发式偏差（Kahneman 系统1/2）。为后续行为科学、权变、战略提供微观基础。",
+        "authors": ["Simon", "Cyert", "March", "Kahneman"],
+    },
     "L-STRATEGY": {
         "name": "战略学派",
         "era": "1970s–",

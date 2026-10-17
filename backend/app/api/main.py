@@ -30,6 +30,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from ..domain.models import TrainingNeed
+from ..domain.constants import THEORY_LINEAGE
 from ..observability.metrics import metrics
 from ..services.context import AppContext, build_context
 from .observability import install_observability, observability_config_from_env
@@ -224,6 +225,21 @@ def kb_units(domain: str | None = None, dilemma: str | None = None, q: str | Non
              "contested": u.contested, "misconceptions": [x.claim for x in u.misconceptions],
              "source": f"{u.source.author}《{u.source.book}》{u.source.locator}",
              "key_points": u.key_points} for u in units]
+
+
+@app.get("/api/v1/kb/lineages")
+def kb_lineages():
+    """学派/年代谱系元数据，供「学派演进图谱」视图使用。"""
+    return [
+        {
+            "code": code,
+            "name": meta["name"],
+            "era": meta["era"],
+            "desc": meta["desc"],
+            "authors": meta["authors"],
+        }
+        for code, meta in THEORY_LINEAGE.items()
+    ]
 
 
 @app.get("/api/v1/archetypes")

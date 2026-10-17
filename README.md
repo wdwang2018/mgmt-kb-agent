@@ -52,7 +52,7 @@
 mgmt-kb-agent/
 ├── backend/
 │   ├── app/
-│   │   ├── domain/            # 领域内核：constants（六域×L1-L5、24 困境、8 学派谱系 THEORY_LINEAGE）、models（pydantic）
+│   │   ├── domain/            # 领域内核：constants（六域×L1-L5、24 困境、9 学派谱系 THEORY_LINEAGE）、models（pydantic）
 │   │   │   └── schemas/       # 导出的 JSON Schema（三个核心工件）
 │   │   ├── ports.py           # 端口协议（LLM/检索/知识库/嵌入/图谱/元数据）
 │   │   ├── adapters/          # Mock/DeepSeek/GLM LLM、内存/Milvus/混合检索、JSON 知识库、JSON 语料层、Kùzu 图谱、PG 元数据
@@ -64,7 +64,8 @@ mgmt-kb-agent/
 │   └── tests/                 # 158 个测试（门禁/检索/原型/流水线/API/LLM 输出形状/知识流水线/安全/检查点/可观测性/LLM 降级链/token 计量/逐任务归因）
 ├── knowledge/
 │   ├── units/                 # 知识单元（JSONL）：lead_draft/strat_draft 为流水线入库文件；
-│   │                         #   classical_mgmt / behavioral_science / quality_systems / china_mgmt 为 P4 系统收集
+│   │                         #   classical_mgmt / behavioral_science / quality_systems / china_mgmt（P4）+ contingency_decision /
+│   │                         #   leadership_dev / strategy_behavior / quality_learn_china（P5）为系统收集
 │   ├── corpus/                # L1 语料层（带页码定位，CC 编号）
 │   ├── cases/                 # 5 个中国情境案例卡
 │   ├── reviews/               # 人工审核台账（runs 联动）
@@ -235,7 +236,7 @@ export GLM_MODEL=glm-5          # 默认 glm-4-plus；glm-5 质量高，glm-4-ai
 1. **能力模型**：六域（战略思维/团队领导/变革管理/沟通影响/教练辅导/执行落地）× L1-L5 行为锚定 → `domain/schemas/competency_model.schema.json`
 2. **困境索引 v1**：24 个管理困境标签（D01-D24），知识按困境挂接 → `domain/schemas/dilemma_index.schema.json`
 3. **知识单元**：概念/理论/模型/工具/研究结论，含证据等级（A 实证强支持/B 情境依赖/C 经验争议）、误区、关系（提出者/学派/争议/前置/应用），以及 **`lineage` 学派谱系标签（双轴索引之一）** → `domain/schemas/knowledge_unit.schema.json`
-4. **学派谱系（P4 新增·双轴）**：8 条演进主干（古典/行为科学/权变系统/战略/领导力发展/质量精益/组织学习/中国管理学），与能力域×困境正交 → `domain/constants.py` 的 `THEORY_LINEAGE`
+4. **学派谱系（P4 新增·双轴，P5 扩至 9 条）**：9 条演进主干（古典/行为科学/**决策科学**/权变系统/战略/领导力发展/质量精益/组织学习/中国管理学），与能力域×困境正交 → `domain/constants.py` 的 `THEORY_LINEAGE`
 
 设计取舍：按「管理困境」而非「名词」索引——学员带着困境来，不是带着「我想学波特五力」来。
 
@@ -243,7 +244,7 @@ export GLM_MODEL=glm-5          # 默认 glm-4-plus；glm-5 质量高，glm-4-ai
 
 | PRD P0 验收标准 | 实测 | 结论 |
 |---|---|---|
-| 30-50 本核心书目 + 两主题要点化 | 69 本书目清单（国内外名家）；45 个知识单元（领导力12+战略12+草稿2+古典4+行为6+质量/系统2+中国7），全部带 lineage 学派标签 | ✅ |
+| 30-50 本核心书目 + 两主题要点化 | 69 本书目清单（国内外名家，28 本已要点化状态跟踪）；73 个知识单元（领导力转型14 / 战略17 / 古典管理4 / 行为科学·激励11 / 权变3 / 领导力发展8 / 质量2 / 组织学习2 / 中国管理11 / 决策1），全部带 lineage 学派标签 | ✅ |
 | 图谱 Schema | 三个 JSON Schema 导出 + 关系字段落地 | ✅ |
 | 黄金评测集 | 24 条（12 需求 + 12 查询） | ✅ |
 | 问答/生成 Demo 可跑通 | 端到端 Demo + API + 29 测试全过 | ✅ |
@@ -472,6 +473,7 @@ curl localhost:8932/api/v1/kb/graph-stats            # 节点与关系边规模
 - **P2 培训支撑扩展**：✅ Web 工作台已落地（课程设计/知识库/运行记录/知识流水线四页签）；待做：备课助手、学员导师、案例导演（多角色模拟）；Kirkpatrick L1-L4 回流
 - **P3 闭环运营**：学员画像、学习路径、课程包自动迭代；剩余工业级项：多实例限流（Redis）、指标导出（Prometheus/Redis 多实例聚合）
 - **P4 理论谱系 + 国内外书库系统收集**：✅ 已落地——新增 `lineage` 学派谱系字段（双轴索引之一，与能力域×困境正交）+ `THEORY_LINEAGE` 八主干常量（古典/行为科学/权变系统/战略/领导力发展/质量精益/组织学习/中国管理学）；系统补齐知识单元 26→45（新增古典管理 4 / 行为科学·激励 6 / 质量·系统 2 / 中国管理学 7，含曾仕强·陈春花·席酉民·华为·海尔·联想·稻盛和夫等），全部回填 lineage；核心书目 38→69（含 Taylor/Fayol/Weber/Mayo/Maslow/McGregor/Herzberg/Vroom/Adams/Deming/Senge 等国际名家 + 曾仕强/陈春花/席酉民/苏东水/张瑞敏/宋志平/宁高宁等中国名家）；Web 知识库页新增「学派谱系」筛选下拉 + 卡片谱系标签。黄金评测七项仍 100%、pytest 158 全过
+- **P5 剩余 P1 书要点化 + 学派演进图谱**：✅ 已落地——将剩余 P1 待要点化书（Fiedler/House/Mintzberg/Simon/Kotter/Kouzes/Greenleaf/Collins/Charan/Covey/Buckingham/Drucker/Chandler/Christensen/Kim/Trout/Slywotzky/Pink/Kahneman/Cialdini/Dweck/Lencioni/Ohno/Nonaka/苏东水/宋志平/宁高宁/田涛 等 28 本）转为知识单元，总数 45→73；新增 `L-DECISION` 决策科学学派 + `CONT`/`DEC`/`LDS` 三个 ID 前缀；Web 知识库页新增「📊 学派演进图谱」视图（横向时序主干 + 9 学派节点 + 各学派单元卡片，点击下钻到卡片检索）；新增 `GET /api/v1/kb/lineages` 端点。黄金评测七项仍 100%、pytest 158 全过
 
 ## 约定
 

@@ -84,10 +84,17 @@ class MemoryRetriever(Retriever):
         return [self.units[uid] for s, uid in scored[:top_k] if s > 0]
 
     def dual_recall(self, domains: list[str], dilemmas: list[str], top_k: int = 6) -> list[KnowledgeUnit]:
-        """能力域 × 困境 双路召回：优先双命中，其次单路命中补齐。"""
+        """能力域 × 困境 双路召回：优先双命中，其次单路命中补齐。
+
+        各组按 uid 稳定排序，避免依赖知识库的加载顺序（不同环境文件枚举顺序不同，
+        否则同一查询会返回不同结果）。
+        """
         both = [u for u in self.units.values() if set(u.domains) & set(domains) and set(u.dilemmas) & set(dilemmas)]
         only_domain = [u for u in self.units.values() if set(u.domains) & set(domains) and u not in both]
         only_dilemma = [u for u in self.units.values() if set(u.dilemmas) & set(dilemmas) and u not in both]
+        both.sort(key=lambda u: u.id)
+        only_domain.sort(key=lambda u: u.id)
+        only_dilemma.sort(key=lambda u: u.id)
         ordered = both + only_dilemma + only_domain
         return ordered[:top_k]
 

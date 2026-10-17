@@ -152,7 +152,7 @@
   "description": "L2 知识单元：概念/理论/模型/工具/研究结论，按管理困境挂接。",
   "properties": {
     "id": {
-      "pattern": "^KU-(LEAD|STRAT|CLASSIC|BEHAV|CHINA|QUALITY|ORGLEARN)-\\d{3}$",
+      "pattern": "^KU-(LEAD|STRAT|CLASSIC|BEHAV|CHINA|QUALITY|ORGLEARN|CONT|DEC|LDS)-\\d{3}$",
       "title": "Id",
       "type": "string"
     },

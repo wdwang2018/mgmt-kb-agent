@@ -83,7 +83,7 @@ class Relation(BaseModel):
 class KnowledgeUnit(BaseModel):
     """L2 知识单元：概念/理论/模型/工具/研究结论，按管理困境挂接。"""
 
-    id: str = Field(pattern=r"^KU-(LEAD|STRAT|CLASSIC|BEHAV|CHINA|QUALITY|ORGLEARN)-\d{3}$")
+    id: str = Field(pattern=r"^KU-(LEAD|STRAT|CLASSIC|BEHAV|CHINA|QUALITY|ORGLEARN|CONT|DEC|LDS)-\d{3}$")
     title: str
     type: KUType
     domains: list[str] = Field(description="胜任力域代码，如 TEAM/STRAT")

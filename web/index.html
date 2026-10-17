@@ -226,6 +226,19 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
 .u-tag{font-size:11px;padding:1px 8px;border-radius:99px;background:#f3f4f6;color:var(--text-2);border:1px solid var(--border)}
 .u-tag.domain{background:var(--primary-soft);color:var(--primary);border-color:#c7d2fe}
 .u-tag.lineage{background:#ecfeff;color:#0e7490;border-color:#a5f3fc}
+/* 学派演进图谱 */
+.kb-graph{overflow-x:auto;padding:6px 0 18px}
+.kb-graph svg{display:block}
+.g-caption{font-size:13px;color:var(--text-2);margin:4px 2px 12px;line-height:1.6}
+.g-era{font-size:10px;fill:#94a3b8}
+.g-name{font-size:12px;font-weight:700;fill:#1e293b}
+.g-count{font-size:10px;fill:#64748b}
+.g-chip{font-size:11px;fill:#334155}
+.chip{cursor:pointer}
+.chip:hover rect{stroke:#6366f1;stroke-width:1.5;fill:#eef2ff}
+.g-legend{font-size:12px;color:var(--text-2);margin-top:10px;display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.g-legend .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin:0 4px 0 10px}
+#kb-view-toggle{white-space:nowrap}
 .u-source{font-size:12px;color:var(--text-2);background:#f9fafb;border-left:3px solid var(--border-2);padding:5px 10px;border-radius:0 6px 6px 0}
 .u-points{list-style:none;font-size:12.8px;display:flex;flex-direction:column;gap:4px}
 .u-points li{padding-left:14px;position:relative}
@@ -472,10 +485,12 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
         <select id="kb-lineage">
           <option value="">全部学派谱系</option>
         </select>
+        <button id="kb-view-toggle" class="btn btn-sm" type="button">📊 学派演进图谱</button>
         <span class="kb-count" id="kb-count"></span>
         <span id="kb-graph-stat"></span>
       </div>
       <div id="kb-grid" class="kb-grid"></div>
+      <div id="kb-graph" class="kb-graph hidden"></div>
     </section>
 
     <!-- ============ Tab 3：运行记录 ============ -->
@@ -1174,8 +1189,26 @@ const DOMAIN_NAMES = {
 const LINEAGE_NAMES = {
   "L-CLASSIC": "古典管理学派", "L-BEHAV": "行为科学学派", "L-CONTINGENCY": "权变与系统学派",
   "L-STRATEGY": "战略学派", "L-LEADERSHIP": "领导力发展学派", "L-QUALITY": "质量与精益学派",
-  "L-ORGLEARN": "组织学习与知识学派", "L-CHINA": "中国管理学与本土实践",
+  "L-ORGLEARN": "组织学习与知识学派", "L-CHINA": "中国管理学与本土实践", "L-DECISION": "决策科学学派",
 };
+// 学派演进图谱：横向时序顺序（非字典序），用来画演进主干
+const LINEAGE_ORDER = [
+  "L-CLASSIC", "L-BEHAV", "L-DECISION", "L-QUALITY", "L-CONTINGENCY",
+  "L-STRATEGY", "L-ORGLEARN", "L-LEADERSHIP", "L-CHINA",
+];
+const LINEAGE_PALETTE = {
+  "L-CLASSIC": "#8b5cf6", "L-BEHAV": "#0ea5e9", "L-DECISION": "#14b8a6",
+  "L-QUALITY": "#f59e0b", "L-CONTINGENCY": "#ef4444", "L-STRATEGY": "#6366f1",
+  "L-ORGLEARN": "#10b981", "L-LEADERSHIP": "#ec4899", "L-CHINA": "#d97706",
+};
+let kbView = "grid";
+function trunc(s, n) { s = (s || ""); return s.length > n ? s.slice(0, n) + "…" : s; }
+function filterByLineage(code) {
+  $("kb-lineage").value = code;
+  kbView = "grid";
+  $("kb-view-toggle").textContent = "📊 学派演进图谱";
+  loadKb();
+}
 
 async function loadKb() {
   if (!graphStatsLoaded) await loadGraphStats();
@@ -1199,6 +1232,9 @@ async function loadKb() {
     }
   }
   const lineage = lineageSel.value;
+  if (kbView === "graph") { await renderKbGraph(); return; }
+  $("kb-graph").classList.add("hidden");
+  $("kb-grid").classList.remove("hidden");
   const params = new URLSearchParams();
   if (q) params.set("q", q);
   if (domain) params.set("domain", domain);
@@ -1235,11 +1271,73 @@ async function loadKb() {
   bindGraphBoxes();
 }
 
+async function renderKbGraph() {
+  $("kb-grid").classList.add("hidden");
+  $("kb-graph").classList.remove("hidden");
+  const [lineages, units] = await Promise.all([
+    api("/api/v1/kb/lineages").then((r) => r.json()),
+    api("/api/v1/kb/units").then((r) => r.json()),
+  ]);
+  const meta = {};
+  lineages.forEach((l) => { meta[l.code] = l; });
+  const byLineage = {};
+  units.forEach((u) => (u.lineage || []).forEach((c) => { (byLineage[c] = byLineage[c] || []).push(u); }));
+  const order = LINEAGE_ORDER.filter((c) => meta[c]);
+  const colW = 168, gapX = 28, padX = 30, axisY = 46, headerY = 80, chipH = 26, chipGap = 6, colTop = 98;
+  const n = order.length;
+  const maxChips = order.reduce((m, c) => Math.max(m, (byLineage[c] || []).length), 0);
+  const svgW = padX * 2 + n * colW + (n - 1) * gapX;
+  const svgH = colTop + maxChips * (chipH + chipGap) + 16;
+  const evColor = { A: "#16a34a", B: "#d97706", C: "#dc2626" };
+  let nodes = "", arrows = "", chips = "";
+  order.forEach((c, i) => {
+    const x0 = padX + i * (colW + gapX);
+    const cx = x0 + colW / 2;
+    const color = LINEAGE_PALETTE[c] || "#6366f1";
+    const m = meta[c];
+    const cnt = (byLineage[c] || []).length;
+    if (i > 0) {
+      const px = padX + (i - 1) * (colW + gapX) + colW;
+      arrows += `<path d="M${px + 5} ${axisY} L${x0 - 5} ${axisY}" stroke="#cbd5e1" stroke-width="2" marker-end="url(#arrow)"/>`;
+    }
+    nodes += `<circle cx="${cx}" cy="${axisY}" r="7" fill="${color}"/>`;
+    nodes += `<text x="${cx}" y="${axisY - 12}" text-anchor="middle" class="g-era">${esc(m.era)}</text>`;
+    nodes += `<text x="${cx}" y="${headerY}" text-anchor="middle" class="g-name">${esc(m.name)}</text>`;
+    nodes += `<text x="${cx}" y="${headerY + 15}" text-anchor="middle" class="g-count">${cnt} 个单元</text>`;
+    (byLineage[c] || []).forEach((u, idx) => {
+      const cy = colTop + idx * (chipH + chipGap);
+      const ev = evColor[u.evidence_level] || "#888";
+      chips += `<g class="chip" onclick="filterByLineage('${c}')">`
+        + `<title>${esc(u.title)}（${esc(u.id)}）· 点击按该学派筛选</title>`
+        + `<rect x="${x0}" y="${cy}" width="${colW}" height="${chipH}" rx="6" fill="#ffffff" stroke="#e5e7eb"/>`
+        + `<circle cx="${x0 + 12}" cy="${cy + chipH / 2}" r="4" fill="${ev}"/>`
+        + `<text x="${x0 + 24}" y="${cy + chipH / 2 + 4}" class="g-chip">${esc(trunc(u.title, 11))}</text></g>`;
+    });
+  });
+  const svg = `<svg width="${svgW}" height="${svgH}" xmlns="http://www.w3.org/2000/svg">`
+    + `<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">`
+    + `<path d="M0,0 L6,3 L0,6 Z" fill="#cbd5e1"/></marker></defs>`
+    + arrows + nodes + chips + `</svg>`;
+  const legend = `<div class="g-legend">证据等级：`
+    + `<span class="dot" style="background:#16a34a"></span>A 实证强支持 `
+    + `<span class="dot" style="background:#d97706"></span>B 情境依赖 `
+    + `<span class="dot" style="background:#dc2626"></span>C 经验争议 `
+    + `&nbsp;·&nbsp; 点击任一节点/卡片可下钻到该学派的卡片检索</div>`;
+  $("kb-graph").innerHTML = `<div class="g-caption">学派演进图谱：从古典效率→行为动机→决策科学→权变系统→战略→组织学习→领导力发展→中国本土实践，箭头表示管理思想的历史演进脉络。</div>` + svg + legend;
+}
+
 let kbTimer = null;
 $("kb-q").addEventListener("input", () => { clearTimeout(kbTimer); kbTimer = setTimeout(loadKb, 300); });
 $("kb-domain").onchange = loadKb;
 $("kb-evidence").onchange = loadKb;
 $("kb-lineage").onchange = loadKb;
+$("kb-view-toggle").onclick = () => {
+  kbView = (kbView === "grid") ? "graph" : "grid";
+  $("kb-view-toggle").textContent = (kbView === "graph") ? "🔍 卡片检索" : "📊 学派演进图谱";
+  $("kb-grid").classList.toggle("hidden", kbView === "graph");
+  $("kb-graph").classList.toggle("hidden", kbView !== "graph");
+  if (kbView === "graph") renderKbGraph(); else loadKb();
+};
 
 /* ==================== 知识图谱（GraphRAG） ==================== */
 let graphEnabled = false;            // 后端 GRAPH_MODE 是否开启（none 时为 false）

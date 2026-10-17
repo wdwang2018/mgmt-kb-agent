@@ -39,10 +39,13 @@ def test_dual_recall_prefers_both_hit():
     ctx = _ctx()
     units = ctx.retriever.dual_recall(["STRAT"], ["D08"], top_k=5)
     ids = [u.id for u in units]
-    assert "KU-STRAT-001" in ids
-    # 双命中（STRAT 且 D08）的单元应排在仅单命中的前面
+    # 召回正确性：战略解码种子单元须被双路召回（不依赖 top_k 截断，用全量核对）
+    full = [u.id for u in ctx.retriever.dual_recall(["STRAT"], ["D08"], top_k=999)]
+    assert "KU-STRAT-001" in full, full
+    # 双命中（STRAT 且 D08）的单元应排在仅单命中的前面：前 len(both) 个结果应全部是双命中
     both = [u for u in units if "STRAT" in u.domains and "D08" in u.dilemmas]
     assert units[0].id == both[0].id
+    assert all(("STRAT" in u.domains and "D08" in u.dilemmas) for u in units[:len(both)]), ids
 
 
 def test_by_ids_roundtrip():
