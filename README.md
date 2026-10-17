@@ -61,7 +61,7 @@ mgmt-kb-agent/
 │   │   └── api/               # FastAPI 路由（含 kb 流水线端点）+ security.py（P0 安全）+ observability.py/middleware.py（P2 可观测性）
 │   ├── observability/         # P2 可观测性：结构化日志 + 进程指标 + LLM 计时包装
 │   ├── scripts/               # run_demo / export_schemas / probe_langgraph
-│   └── tests/                 # 144 个测试（门禁/检索/原型/流水线/API/LLM 输出形状/知识流水线/安全/检查点/可观测性）
+│   └── tests/                 # 154 个测试（门禁/检索/原型/流水线/API/LLM 输出形状/知识流水线/安全/检查点/可观测性/LLM 降级链）
 ├── knowledge/
 │   ├── units/                 # 知识单元（JSONL；lead_draft/strat_draft 为流水线入库文件）
 │   ├── corpus/                # L1 语料层（带页码定位，CC 编号）
@@ -370,7 +370,7 @@ curl localhost:8932/api/v1/kb/graph-stats            # 节点与关系边规模
 | 健康检查 | `/healthz` | 同时暴露 llm / vector_mode / graph_mode / store_mode，退化一目了然 |
 | 计划 / 区域 | free / Singapore | 免费 750 小时/月；冷启动约 50s；国内访问延迟最低 |
 
-环境变量（render.yaml 预设）：`LLM_MODE=glm`、`VECTOR_MODE=hybrid`、`EMBED_MODE=glm`、`GRAPH_MODE=kuzu`、`PYTHON_VERSION=3.13.0`；**`GLM_API_KEY` 用 `sync: false`，只在你 Render 后台填、不进仓库**（沿用白起SSE 敏感 env 约定）。未填 Key 时 LLM 自动回落 mock，不阻断启动。
+环境变量（render.yaml 预设）：`LLM_MODE=fallback`（GLM 优先、失败自动回落 Mock 的故障降级链）、`LLM_FALLBACK_ORDER=glm,mock`、`VECTOR_MODE=hybrid`、`EMBED_MODE=glm`、`GRAPH_MODE=kuzu`、`PYTHON_VERSION=3.13.0`；**`GLM_API_KEY` 用 `sync: false`，只在你 Render 后台填、不进仓库**（沿用白起SSE 敏感 env 约定）。未填 Key 时 GLM 链首端瞬时跳过、自动落到 Mock，不阻断启动。
 
 **持久化边界（诚实说明）**：Render free 计划无持久磁盘，重启/重新部署后文件系统重置——
 
@@ -439,6 +439,23 @@ curl localhost:8932/api/v1/kb/graph-stats            # 节点与关系边规模
 
 要点：① LLM 计时在组合根 `build_context` 用 `wrap_llm` 包裹，**import 失败兜底退回原对象**，绝不因可观测性阻断启动；② 指标为进程内累加器，单实例够用，多实例聚合需 Prometheus/Redis（后续项，见路线）；③ 测试 8 例（`tests/test_observability.py`）含 JSON 序列化、关联 ID 回传、计数器递增、LLM 计时与四轮变异验证。
 
+### P3 韧性·LLM 故障降级链
+
+线上当前用 GLM（智谱）。当 GLM 触发限流(429)/网络抖动/服务端 5xx/无 Key 时，若没有降级，整条课程设计流水线会硬失败。本层把多个 LLM 后端串成一条链，按优先级依次尝试，任一后端成功即采用其结果；全部失败才退回调用方 fallback（保证门禁与溯源永远有完整输入）。失败判定与现有适配器约定一致：`complete_json` 返回调用方传入的 fallback 对象本身（identity）即视为失败，`complete` 以空字符串判定失败；子后端若抛异常，链自动跳过，不阻断整体。
+
+**结构**：
+- `backend/app/adapters/llm_fallback.py`：`FallbackLLM`（按序尝试，首个成功者胜出；记录 `active_backend` 与 `usage`）+ `build_fallback_chain`（按名称组装，空/全无效退回 Mock、单后端不包链）
+- `backend/app/adapters/llm_factory.py`：`LLM_MODE=fallback` 分支，读 `LLM_FALLBACK_ORDER` 组装链
+- `backend/app/observability/instrument.py`：`InstrumentedLLM` 新增 `__getattr__` 透传，使降级链的 `llm_chain` / `active_backend` 透过计时包装仍对 `/healthz` 可见
+- `backend/app/api/main.py`：`/healthz` 动态附加 `llm_chain`（降级链顺序）与 `llm_active_backend`（最近一次成功采用的后端），无降级链时不附加（保持兼容）
+
+| 环境变量 | 默认 | 说明 |
+|---|---|---|
+| `LLM_MODE` | `mock` | `mock` / `glm` / `deepseek` / **`fallback`（故障降级链）** |
+| `LLM_FALLBACK_ORDER` | `glm,deepseek,mock` | 降级链优先级（逗号分隔）；缺 Key 的后端瞬时跳过，无需预过滤；线上仅配 GLM Key 时设为 `glm,mock` |
+
+要点：① 主模型健康时行为与单模型模式完全一致（GLM 优先），仅在其失效时透明回落，无回归；② 实测（2026-10-17）：清空 `GLM_API_KEY` 后流水线自动落到 Mock，`/healthz` 的 `llm_active_backend` 翻转为 `mock-deterministic-v1`，课程包仍 `completed`（30 次 LLM 调用全由 Mock 兜底）；③ 测试 10 例（`tests/test_llm_fallback.py`）含顺序尝试、异常跳过、全失败回落、工厂装配、含四轮变异验证（反转成功判定后 3 例必失败，证明测试有牙）。
+
 ## 路线
 
 - **P1 知识流水线**：✅ 已落地——采集（L1 语料带页码定位）→ 加工（规则/LLM 双模抽取）→ K1-K5 质检 → 人工审核台（Web 第四页签 + API）→ 编号入库即时生效
@@ -446,8 +463,9 @@ curl localhost:8932/api/v1/kb/graph-stats            # 节点与关系边规模
 - **P1 基础设施·图与持久化**：✅ 已落地——`GraphStore` 端口 + `KuzuGraphStore`（嵌入式、**实测 26 单元建出 103 条关系边**：前置链/提出者/学派/争议/案例查询全通）+ `Neo4jGraphStore`（lazy 占位，Cypher 同构可平移）+ `MetadataStore` 双适配器（JSON 默认 / PG lazy）+ `GRAPH_MODE` / `STORE_MODE` 切换与自动降级；**待实测**：Neo4j 与 PG 真实服务端路径（环境缺 Java/PG）
 - **P1 基础设施·可靠性与 CI**：✅ 已落地——检查点持久化（sqlite 默认 + postgres 预留 + 降级链，重启续会话实测通过）+ GitHub Actions（pytest + 黄金评测 + 可选 Render 自动部署）
 - **P2 可观测性**：✅ 已落地——结构化日志（text/json 双格式 + 文件落盘）/ 进程指标（QPS·错误率·P95 延迟·LLM 耗时）/ 请求关联 ID 与 `/api/v1/metrics` 端点
+- **P3 韧性·LLM 故障降级链**：✅ 已落地——`FallbackLLM` 按 `LLM_FALLBACK_ORDER` 串联多后端，主模型（GLM）遇 429/5xx/网络抖动/无 Key 时自动回落下一级（如 Mock），流水线永不硬失败；`/healthz` 暴露 `llm_chain` 与 `llm_active_backend`，可观测性透传展示
 - **P2 培训支撑扩展**：✅ Web 工作台已落地（课程设计/知识库/运行记录/知识流水线四页签）；待做：备课助手、学员导师、案例导演（多角色模拟）；Kirkpatrick L1-L4 回流
-- **P3 闭环运营**：学员画像、学习路径、课程包自动迭代；剩余工业级项：多实例限流（Redis）、LLM 故障降级链（GLM→DeepSeek→Mock）、token 计量与指标导出（Prometheus/Redis 多实例聚合）
+- **P3 闭环运营**：学员画像、学习路径、课程包自动迭代；剩余工业级项：多实例限流（Redis）、token 计量、指标导出（Prometheus/Redis 多实例聚合）
 
 ## 约定
 

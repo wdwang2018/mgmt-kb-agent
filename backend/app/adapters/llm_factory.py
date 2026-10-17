@@ -6,6 +6,7 @@ import os
 
 from ..ports import LLMClient
 from .llm_deepseek import DeepSeekLLM
+from .llm_fallback import build_fallback_chain
 from .llm_glm import GLMLLM
 from .llm_mock import MockLLM
 
@@ -16,4 +17,7 @@ def get_llm() -> LLMClient:
         return DeepSeekLLM()
     if mode == "glm":
         return GLMLLM()
+    if mode == "fallback":
+        order = os.environ.get("LLM_FALLBACK_ORDER", "glm,deepseek,mock").split(",")
+        return build_fallback_chain(order)
     return MockLLM()

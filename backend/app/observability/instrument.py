@@ -35,6 +35,11 @@ class InstrumentedLLM:
         finally:
             metrics.record_llm_call(round((time.perf_counter() - t) * 1000, 1))
 
+    def __getattr__(self, name):
+        """透传未知属性到被包裹对象（如 FallbackLLM 的 active_backend/llm_chain）。"""
+        inner = object.__getattribute__(self, "_inner")
+        return getattr(inner, name)
+
 
 def wrap_llm(inner):
     """包裹 LLM 适配器以开启调用计时；返回原对象类型透明兼容（含 .name）。"""

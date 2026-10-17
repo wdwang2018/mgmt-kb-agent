@@ -14,7 +14,9 @@ services:
       - key: PYTHON_VERSION
         value: "3.13.0"
       - key: LLM_MODE
-        value: glm              # 在线模型（GLM-5）；未填 Key 时自动回落 mock，不阻断
+        value: fallback         # 故障降级链：GLM 优先，失败自动回落 Mock，流水线永不硬失败
+      - key: LLM_FALLBACK_ORDER
+        value: "glm,mock"       # 仅配置 GLM Key，故链为 glm→mock；补 DEEPSEEK_API_KEY 后可改 glm,deepseek,mock
       - key: VECTOR_MODE
         value: hybrid           # BM25 + 稠密双路召回 RRF 融合；milvus 不可用自动降级 memory
       - key: EMBED_MODE

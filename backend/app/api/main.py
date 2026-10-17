@@ -74,13 +74,20 @@ class ResumeBody(BaseModel):
 @app.get("/healthz")
 def healthz():
     c = _ctx()
-    return {"status": "ok", "llm": c.pipeline.deps.llm.name,
-            "knowledge_units": len(c.retriever.units),
-            "vector_mode": c.vector_mode, "vector_note": c.vector_note,
-            "graph_mode": c.graph_mode, "graph_note": c.graph_note,
-            "store_mode": c.store_mode, "store_note": c.store_note,
-            "checkpoint_mode": c.checkpoint_mode, "checkpoint_note": c.checkpoint_note,
-            "metrics": metrics.snapshot(len(c.retriever.units))}
+    llm = c.pipeline.deps.llm
+    out = {"status": "ok", "llm": llm.name,
+           "knowledge_units": len(c.retriever.units),
+           "vector_mode": c.vector_mode, "vector_note": c.vector_note,
+           "graph_mode": c.graph_mode, "graph_note": c.graph_note,
+           "store_mode": c.store_mode, "store_note": c.store_note,
+           "checkpoint_mode": c.checkpoint_mode, "checkpoint_note": c.checkpoint_note,
+           "metrics": metrics.snapshot(len(c.retriever.units))}
+    # 降级链额外信息（非 fallback 模式无这些字段，动态附加，保持 healthz 兼容）
+    if hasattr(llm, "llm_chain"):
+        out["llm_chain"] = llm.llm_chain
+    if hasattr(llm, "active_backend"):
+        out["llm_active_backend"] = llm.active_backend
+    return out
 
 
 @app.get("/api/v1/metrics")
