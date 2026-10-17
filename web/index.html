@@ -329,6 +329,10 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
       知识流水线
       <span class="nav-badge hidden" id="kbpipe-badge">0</span>
     </button>
+    <button class="nav-item" data-tab="tokens">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      TOKEN 消耗
+    </button>
     <div class="sidebar-foot">P1 · 工作台 v0.3</div>
   </nav>
 
@@ -475,7 +479,7 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
       <div class="card">
         <table class="runs-table">
           <thead><tr>
-            <th>运行编号</th><th>状态</th><th>培训对象</th><th>时长</th><th>行业</th><th>模块数</th><th>更新时间</th><th></th>
+            <th>运行编号</th><th>状态</th><th>培训对象</th><th>时长</th><th>行业</th><th>模块数</th><th>Token</th><th>更新时间</th><th></th>
           </tr></thead>
           <tbody id="runs-body"></tbody>
         </table>
@@ -580,6 +584,31 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
         <div id="corpus-empty" class="runs-empty hidden">语料层为空，提交第一条语料</div>
       </div>
     </section>
+
+    <!-- ============ Tab 5：TOKEN 消耗 ============ -->
+    <section id="tab-tokens" class="tab">
+      <div class="card">
+        <div class="done-head">
+          <h3 style="font-size:14.5px">Token 消耗总览</h3>
+        </div>
+        <div class="stat-row" id="token-global"></div>
+        <p class="form-tip">全局累计为<b>进程级计数</b>，服务重启后归零；每条任务的消耗随运行记录持久化（见下方逐任务明细），重启后仍可查看。估算口径：中文每字 ≈1 token、拉丁文每 4 字符 ≈1 token（GLM/Mock/降级链共用，非各厂商精确计费）。</p>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <div class="done-head">
+          <h3 style="font-size:14.5px">逐任务 Token 明细 <span class="kb-count" id="token-count"></span></h3>
+          <button class="btn btn-sm" id="token-refresh">刷新</button>
+        </div>
+        <table class="runs-table">
+          <thead><tr>
+            <th>运行编号</th><th>状态</th><th>培训对象</th>
+            <th>提示词</th><th>生成</th><th>合计</th><th>调用次数</th><th>更新时间</th>
+          </tr></thead>
+          <tbody id="token-body"></tbody>
+        </table>
+        <div id="token-empty" class="runs-empty hidden">暂无运行记录，先去「课程设计」生成一份课程包</div>
+      </div>
+    </section>
   </main>
 </div>
 
@@ -652,6 +681,7 @@ function reloadActiveTab() {
   if (tab === "kb") loadKb();
   else if (tab === "runs") loadRuns();
   else if (tab === "kbpipe") loadKbPipe();
+  else if (tab === "tokens") loadTokens();
 }
 
 $("api-base-save").onclick = () => {
@@ -681,6 +711,7 @@ document.querySelectorAll(".nav-item").forEach((btn) => {
     if (btn.dataset.tab === "kb") loadKb();
     if (btn.dataset.tab === "runs") loadRuns();
     if (btn.dataset.tab === "kbpipe") loadKbPipe();
+    if (btn.dataset.tab === "tokens") loadTokens();
   };
 });
 
@@ -1016,8 +1047,9 @@ async function showDone(runId) {
   };
   const all = [pick("modules_count", "模块"), pick("activities_count", "活动"),
                pick("assessments_count", "评估题"), pick("citations_count", "引用")];
-  $("done-stats").innerHTML = ["模块", "活动", "评估题", "引用"].map((l, n) =>
-    `<div class="stat"><div class="num">${esc(String(all[n]))}</div><div class="lbl">${l}</div></div>`).join("");
+  const toks = (pkg.tokens && pkg.tokens.tokens_total) ? pkg.tokens.tokens_total : "-";
+  $("done-stats").innerHTML = ["模块", "活动", "评估题", "引用", "Token"].map((l, n) =>
+    `<div class="stat"><div class="num">${esc(String(n === 4 ? toks : all[n]))}</div><div class="lbl">${l}</div></div>`).join("");
   const gates = (pkg.gates || []).map((g) =>
     `<span class="gate-badge ${g.passed ? "" : "fail"}">${g.passed ? "✓" : "✗"} ${esc(g.gate || "")}</span>`).join("");
   $("done-gates").innerHTML = gates || '<span style="font-size:12.5px;color:var(--text-3)">门禁报告见课程包</span>';
@@ -1340,6 +1372,7 @@ async function loadRuns() {
       <td>${r.duration_minutes ? esc(String(Math.round(r.duration_minutes / 60 * 10) / 10)) + " 小时" : "-"}</td>
       <td>${esc(r.industry || "-")}</td>
       <td style="text-align:center">${r.modules ?? "-"}</td>
+      <td style="text-align:right;font-family:ui-monospace,Consolas,monospace;font-size:12px">${(r.tokens && r.tokens.tokens_total) ? r.tokens.tokens_total : "-"}</td>
       <td style="font-size:12px;color:var(--text-2)">${esc((r.updated_at || "").replace("T", " ").slice(0, 19))}</td>
       <td>${r.has_package ? '<button class="btn btn-sm">查看</button>' : ""}</td>
     </tr>`).join("");
@@ -1357,6 +1390,38 @@ async function loadRuns() {
   });
 }
 $("btn-close-detail").onclick = () => $("run-detail").classList.add("hidden");
+
+/* ==================== Tab 5：TOKEN 消耗 ==================== */
+async function loadTokens() {
+  let data = { global: {}, by_run: [] };
+  try { data = await (await api("/api/v1/tokens")).json(); } catch (_) { data = { global: {}, by_run: [] }; }
+  const g = data.global || {};
+  const gStats = [
+    ["累计 Token", g.tokens_total ?? 0],
+    ["提示词", g.prompt_tokens_total ?? 0],
+    ["生成", g.completion_tokens_total ?? 0],
+    ["LLM 调用", g.llm_calls_total ?? 0],
+  ];
+  $("token-global").innerHTML = gStats.map(([l, v]) =>
+    `<div class="stat"><div class="num">${esc(String(v))}</div><div class="lbl">${l}</div></div>`).join("");
+  const rows = data.by_run || [];
+  $("token-count").textContent = `共 ${rows.length} 条任务`;
+  $("token-empty").classList.toggle("hidden", rows.length > 0);
+  $("token-body").innerHTML = rows.map((r) => {
+    const t = r.tokens || {};
+    return `<tr>
+      <td style="font-family:ui-monospace,Consolas,monospace;font-size:12px">${esc(r.run_id)}</td>
+      <td><span class="status-badge st-${esc(r.status || "")}">${esc(r.status || "")}</span></td>
+      <td>${esc(r.audience || "-")}</td>
+      <td style="text-align:right;font-family:ui-monospace,Consolas,monospace;font-size:12px">${esc(String(t.prompt_tokens ?? 0))}</td>
+      <td style="text-align:right;font-family:ui-monospace,Consolas,monospace;font-size:12px">${esc(String(t.completion_tokens ?? 0))}</td>
+      <td style="text-align:right;font-weight:700;font-family:ui-monospace,Consolas,monospace;font-size:12px">${esc(String(t.tokens_total ?? 0))}</td>
+      <td style="text-align:center">${esc(String(t.llm_calls ?? 0))}</td>
+      <td style="font-size:12px;color:var(--text-2)">${esc((r.updated_at || "").replace("T", " ").slice(0, 19))}</td>
+    </tr>`;
+  }).join("");
+}
+$("token-refresh").onclick = loadTokens;
 
 /* ==================== 启动 ==================== */
 refreshConn().then((j) => { if (j) loadKbPipe(); });

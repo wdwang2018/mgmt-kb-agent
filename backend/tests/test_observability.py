@@ -160,3 +160,52 @@ def test_instrumented_llm_records_tokens():
 #   - 若 estimate_tokens 恒返回 0 → test_estimate_tokens_mixed / test_instrumented_llm_records_tokens 失败
 #   - 若 metrics.record_llm_tokens 不累加 → test_instrumented_llm_records_tokens 失败
 # ---------------------------------------------------------------------------
+
+
+def test_run_tokens_unknown_returns_zeros():
+    """未知任务返回全 0，绝不抛错。"""
+    assert metrics.run_tokens("never-existed") == {
+        "prompt_tokens": 0, "completion_tokens": 0, "tokens_total": 0, "llm_calls": 0,
+    }
+
+
+def test_per_run_token_attribution():
+    """set_current_run 后，token 与调用次数须同时归因到该任务桶与全局，且互不串扰。"""
+    rid = f"attrib-{id(object())}"
+    other = f"attrib-other-{id(object())}"
+    metrics.set_current_run(rid)
+
+    # 两次调用：每次 prompt=10 / completion=7，因此该任务累计 prompt=20 completion=14 calls=2
+    metrics.record_llm_call(12.3)
+    metrics.record_llm_tokens(10, 7)
+    metrics.record_llm_call(4.5)
+    metrics.record_llm_tokens(10, 7)
+
+    own = metrics.run_tokens(rid)
+    assert own["prompt_tokens"] == 20
+    assert own["completion_tokens"] == 14
+    assert own["tokens_total"] == 34
+    assert own["llm_calls"] == 2
+
+    # 另一任务桶不受影响（未设定 contextvar 时记录只进全局）
+    assert metrics.run_tokens(other)["tokens_total"] == 0
+
+    # 全局也累计了（prompt 20 + completion 14）
+    snap = metrics.snapshot(0)
+    assert snap["prompt_tokens_total"] >= 20
+    assert snap["completion_tokens_total"] >= 14
+    assert snap["llm_calls_total"] >= 2
+
+    metrics.clear_current_run()
+    # 清除后再次记录只进全局，不再累加进 rid
+    metrics.record_llm_tokens(10, 7)
+    assert metrics.run_tokens(rid)["tokens_total"] == 34
+
+
+# ---------------------------------------------------------------------------
+# 变异验证（逐任务归因）：
+#   - 若 record_llm_tokens 不写入 per-run 桶（去掉 `if rid is not None` 分支）→
+#     test_per_run_token_attribution 中 own["tokens_total"]==34 断言失败
+#   - 若 record_llm_call 不累加 per-run calls → own["llm_calls"]==2 断言失败
+# ---------------------------------------------------------------------------
+

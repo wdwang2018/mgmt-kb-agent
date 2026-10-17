@@ -144,10 +144,50 @@ def list_runs(limit: int = 50):
             "industry": need.get("industry"),
             "modules": len(st.get("modules") or []),
             "has_package": pkg is not None,
+            "tokens": st.get("tokens") or {"prompt_tokens": 0, "completion_tokens": 0,
+                                           "tokens_total": 0, "llm_calls": 0},
         })
         if len(rows) >= limit:
             break
     return rows
+
+
+@app.get("/api/v1/tokens")
+def tokens_overview(limit: int = 100):
+    """Token 消耗总览：进程级全局累计 + 逐任务（run）明细。
+
+    全局累计为进程级（服务重启归零）；逐任务明细读取各运行 state.json 中持久化的
+    tokens 字段，重启后仍可查看（与「运行记录」一一对应）。
+    """
+    c = _ctx()
+    rows = []
+    for d in sorted(c.output_dir.glob("run-*"), reverse=True):
+        st_file = d / "state.json"
+        if not st_file.exists():
+            continue
+        try:
+            st = json.loads(st_file.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        pkg_file = d / "package.json"
+        audience = None
+        if pkg_file.exists():
+            try:
+                audience = (json.loads(pkg_file.read_text(encoding="utf-8")) or {}).get("need", {}).get("audience")
+            except Exception:
+                audience = None
+        t = st.get("tokens") or {"prompt_tokens": 0, "completion_tokens": 0,
+                                 "tokens_total": 0, "llm_calls": 0}
+        rows.append({
+            "run_id": st.get("run_id", d.name),
+            "status": st.get("status"),
+            "audience": audience,
+            "updated_at": st.get("updated_at"),
+            "tokens": t,
+        })
+        if len(rows) >= limit:
+            break
+    return {"global": metrics.snapshot(len(c.retriever.units)), "by_run": rows}
 
 
 @app.get("/api/v1/runs/{run_id}")

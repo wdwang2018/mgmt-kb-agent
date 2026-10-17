@@ -17,6 +17,7 @@ from ..domain.models import CoursePackage, TrainingNeed
 from ..graph.nodes import NodeDeps
 from ..graph.state import initial_state
 from ..graph.workflow import build_workflow
+from ..observability.metrics import metrics
 
 _TZ = timezone(timedelta(hours=8))
 
@@ -76,6 +77,7 @@ class CourseDesignPipeline:
             "interrupt": result.interrupt,
             "gates": [g.model_dump() if hasattr(g, "model_dump") else g for g in gates],
             "modules": [m.title for m in snapshot_values.get("modules", [])] if snapshot_values.get("modules") else [],
+            "tokens": metrics.run_tokens(run_id),  # 逐任务 token 归因，随运行记录持久化
         }
         (self.runs_dir / run_id).mkdir(parents=True, exist_ok=True)
         (self.runs_dir / run_id / "state.json").write_text(
@@ -96,12 +98,14 @@ class CourseDesignPipeline:
             "assessments_count": len(package.assessments) if package else 0,
             "citations_count": len(package.citations) if package else 0,
             "human_reviewed": bool(package.human_reviewed) if package else False,
+            "tokens": metrics.run_tokens(run_id),
         }
         return RunResult(run_id, status, interrupt, package, detail)
 
     # ------------------------------------------------------------------ 公共
     def _invoke(self, payload: Any, run_id: str) -> RunResult:
         """统一执行入口：任何节点异常都收敛为 failed 状态并落盘，不向上抛。"""
+        metrics.set_current_run(run_id)          # 绑定任务，使 LLM token 消耗归属本 run
         try:
             self.graph.invoke(payload, self._config(run_id))
             result = self._to_result(run_id)
@@ -115,11 +119,14 @@ class CourseDesignPipeline:
                 (self.runs_dir / run_id / "state.json").write_text(json.dumps({
                     "run_id": run_id, "status": "failed", "updated_at": _now(),
                     "gates": [], "modules": [],
+                    "tokens": metrics.run_tokens(run_id),
                     "error": result.detail["error"],
                 }, ensure_ascii=False, indent=2), encoding="utf-8")
             except Exception:
                 pass  # 落盘失败不影响调用方拿到 failed 结果
             return result
+        finally:
+            metrics.clear_current_run()
 
     def run(self, need: TrainingNeed) -> RunResult:
         run_id = f"run-{datetime.now(_TZ).strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
@@ -161,5 +168,8 @@ class CourseDesignPipeline:
             "assessments_count": len(package.assessments) if package else 0,
             "citations_count": len(package.citations) if package else 0,
             "human_reviewed": bool(package.human_reviewed) if package else False,
+            "tokens": record.get("tokens") or {
+                "prompt_tokens": 0, "completion_tokens": 0, "tokens_total": 0, "llm_calls": 0,
+            },
         }
         return RunResult(record["run_id"], record["status"], record.get("interrupt"), package, detail)

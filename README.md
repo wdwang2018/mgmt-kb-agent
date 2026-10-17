@@ -61,7 +61,7 @@ mgmt-kb-agent/
 │   │   └── api/               # FastAPI 路由（含 kb 流水线端点）+ security.py（P0 安全）+ observability.py/middleware.py（P2 可观测性）
 │   ├── observability/         # P2 可观测性：结构化日志 + 进程指标 + LLM 计时包装
 │   ├── scripts/               # run_demo / export_schemas / probe_langgraph
-│   └── tests/                 # 156 个测试（门禁/检索/原型/流水线/API/LLM 输出形状/知识流水线/安全/检查点/可观测性/LLM 降级链/token 计量）
+│   └── tests/                 # 158 个测试（门禁/检索/原型/流水线/API/LLM 输出形状/知识流水线/安全/检查点/可观测性/LLM 降级链/token 计量/逐任务归因）
 ├── knowledge/
 │   ├── units/                 # 知识单元（JSONL；lead_draft/strat_draft 为流水线入库文件）
 │   ├── corpus/                # L1 语料层（带页码定位，CC 编号）
@@ -72,7 +72,7 @@ mgmt-kb-agent/
 │   ├── golden/                # 黄金评测集（12 需求 + 12 检索查询）
 │   └── run_eval.py            # 评测脚本 → report-<日期>.md
 ├── web/                       # Web 工作台（单页应用，FastAPI 静态挂载）
-│   └── index.html             # 课程设计 / 知识库 / 运行记录 / 知识流水线 四个页签
+│   └── index.html             # 课程设计 / 知识库 / 运行记录 / 知识流水线 / TOKEN 消耗 五个页签
 ├── .github/workflows/ci.yml   # CI：pytest + 黄金评测 +（配了 Hook 才执行）Render 自动部署
 ├── render.yaml                # Render 部署蓝图（Blueprint 一键部署）
 ├── requirements.txt
@@ -215,8 +215,9 @@ export GLM_MODEL=glm-5          # 默认 glm-4-plus；glm-5 质量高，glm-4-ai
 |---|---|
 | **课程设计** | 需求诊断单表单（七要素 + 时长快捷档）→ 九节点流水线进度条 → 人工审核卡片（能力目标确认/门禁升级，批准或带反馈打回）→ 课程包 Markdown 渲染 + 一键下载 |
 | **知识库** | 知识单元检索：关键词 + 领域 + 证据等级（A/B/C）筛选；卡片含引用定位、学员常见误区、学派争议标记；**图谱关系面板**（GraphRAG） |
-| **运行记录** | 历史 run 列表（状态/对象/时长/模块数），点击回看课程包 |
+| **运行记录** | 历史 run 列表（状态/对象/时长/模块数/**Token**），点击回看课程包 |
 | **知识流水线**（P1） | 语料采集表单 → 五节点进度 → 草稿审核卡片（K1-K5 明细、批准/打回）→ 草稿台账 + L1 语料层；待审数量实时徽标 |
+| **TOKEN 消耗**（P3） | 全局累计统计卡（合计/提示词/生成/LLM 调用）+ 逐任务明细表（每条 run 的提示词/生成/合计/调用次数，持久化可回看）；课程包完成页同步显示该次 Token 消耗 |
 
 配套 API：`GET /api/v1/runs`、`GET /api/v1/runs/{id}`（补全计数字段，刷新后统计不丢）、`GET /api/v1/kb/units`（含误区）、kb 流水线六端点（见上文）、CORS 全开、静态挂载（API 路由优先，不被遮蔽）。
 
@@ -465,6 +466,7 @@ curl localhost:8932/api/v1/kb/graph-stats            # 节点与关系边规模
 - **P2 可观测性**：✅ 已落地——结构化日志（text/json 双格式 + 文件落盘）/ 进程指标（QPS·错误率·P95 延迟·LLM 耗时）/ 请求关联 ID 与 `/api/v1/metrics` 端点
 - **P3 韧性·LLM 故障降级链**：✅ 已落地——`FallbackLLM` 按 `LLM_FALLBACK_ORDER` 串联多后端，主模型（GLM）遇 429/5xx/网络抖动/无 Key 时自动回落下一级（如 Mock），流水线永不硬失败；`/healthz` 暴露 `llm_chain` 与 `llm_active_backend`，可观测性透传展示
 - **P3 token 计量**：✅ 已落地——`InstrumentedLLM` 包装层对每次调用的 `prompt(system+user)` 与 `completion(返回值)` 做中英混合 token 估算（CJK 每字 1 token、拉丁每 4 字符 1 token），累加 `prompt_tokens_total`/`completion_tokens_total`/`tokens_total`；经 `/api/v1/metrics` 与 `/healthz` 暴露，GLM/Mock/降级链共用同一计费口径
+- **P3 token 逐任务归因 + Web 面板**：✅ 已落地——流水线 `_invoke` 用 `contextvar` 绑定 `run_id`，每次 LLM 调用同时计入「进程级全局」与「该任务独立桶」；任务桶随 `state.json` 持久化（重启仍可查）。新增 `GET /api/v1/tokens`（全局累计 + 逐任务明细），Web 工作台新增「TOKEN 消耗」页签（全局统计卡 + 逐任务表：提示词/生成/合计/调用次数），并在「运行记录」表与课程包完成页同步展示每条任务的 token 消耗
 - **P2 培训支撑扩展**：✅ Web 工作台已落地（课程设计/知识库/运行记录/知识流水线四页签）；待做：备课助手、学员导师、案例导演（多角色模拟）；Kirkpatrick L1-L4 回流
 - **P3 闭环运营**：学员画像、学习路径、课程包自动迭代；剩余工业级项：多实例限流（Redis）、指标导出（Prometheus/Redis 多实例聚合）
 
