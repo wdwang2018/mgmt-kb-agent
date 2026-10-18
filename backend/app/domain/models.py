@@ -285,6 +285,27 @@ class ArticleSource(str, Enum):
     FILE = "file"
 
 
+class ValueFlag(BaseModel):
+    """内容价值判断标记：把「软文 / 哗众取宠 / 无实际价值」这类问题显式化。
+
+    用途：让 agent 在文章一进来就给基本判断，尽早揪出伪干货，避免浪费时间。
+    severity=hard 表示强信号（调用方应短路、直接判放弃）；soft 表示需谨慎。
+    """
+
+    code: str = Field(description="SOFT_SELL/CLICKBAIT/THIN/NO_SUBSTANCE/CONTENT_FARM")
+    label: str = Field(description="中文标签，如「软文/营销导流」")
+    severity: Literal["hard", "soft"] = Field(description="hard=建议放弃(短路)；soft=需谨慎")
+    detail: str = Field(default="", description="命中原因，便于用户复核")
+
+
+class Verdict(str, Enum):
+    """三态基本判断：能否把这篇文章整理成一套课程。"""
+
+    COURSE = "COURSE"        # 干净，可成课
+    CAUTION = "CAUTION"      # 可成课但有价值风险，需人工复核
+    DISCARD = "DISCARD"      # 不可成课 / 强软文标题党，建议放弃
+
+
 class ArticleAnalysis(BaseModel):
     """文章解析产物：读完一篇文章，判断它能否成课、该做成哪种课。
 
@@ -320,6 +341,11 @@ class ArticleAnalysis(BaseModel):
 
     warnings: list[str] = Field(default_factory=list, description="提示：抓取失败/过短/证据不足等")
     raw_chars: int = Field(default=0, description="摄入正文字符数（用于判断是否过短/超长被截断）")
+
+    # —— 内容价值判断层（P6+）：文章一进来先给基本判断，早揪伪干货 ——
+    value_flags: list[ValueFlag] = Field(default_factory=list, description="内容价值标记（软文/标题党/无实质等）")
+    verdict: str = Field(default="COURSE", description="COURSE/CAUTION/DISCARD 三态基本判断")
+    verdict_label: str = Field(default="可成课", description="基本判断的中文标签")
 
     def fill_training_need(self, need: "TrainingNeed") -> "TrainingNeed":
         """把解析结论注入需求诊断单，供课程设计流水线直接消费。"""

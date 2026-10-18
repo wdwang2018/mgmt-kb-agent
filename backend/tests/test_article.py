@@ -20,10 +20,11 @@ import pytest
 from app.adapters.llm_mock import MockLLM
 from app.domain.constants import COMPETENCY_DOMAINS, COURSE_TYPES, DILEMMA_INDEX, THEORY_LINEAGE
 from app.domain.models import (ArticleAnalysis, ArticleSource, KnowledgeUnit,
-                               TrainingNeed)
+                               TrainingNeed, ValueFlag)
 from app.services.article_analyzer import (_norm_course_type, _norm_evidence,
                                            _norm_sentences, _norm_str_list,
                                            _resolve_codes, analyze_article,
+                                           pre_screen, _verdict,
                                            _code_table)
 from app.services.article_intake import (IntakeError, _extract_main_text,
                                          _is_forbidden_ip, intake_bytes,
@@ -440,3 +441,134 @@ def test_api_analyze_file_upload_and_formats():
 
     r = client.post("/api/v1/analyze/file", files={"file": ("e.txt", b"", "text/plain")})
     assert r.status_code == 400 and "empty_file" in r.json()["detail"]
+
+
+# ---------------------------------------------------------------------------
+# F. 内容价值判断层（早判：软文/标题党/无实质，避免浪费时间）
+# ---------------------------------------------------------------------------
+def test_pre_screen_flags_soft_sell_hard():
+    """含「扫码加我微信」必须被标为强软文（可直接判放弃）。"""
+    text = ("今天分享一个超好用的管理方法。") * 20 + "想深入学习的朋友可以扫码加我微信，免费领取资料。"
+    flags = pre_screen(text)
+    soft = [f for f in flags if f.code == "SOFT_SELL"]
+    assert soft, "营销导流信号必须被识别"
+    assert soft[0].severity == "hard", "软文营销是强信号，应可直接判放弃"
+
+
+def test_pre_screen_flags_clickbait_hard():
+    """含多个标题党词必须标为强哗众取宠。"""
+    text = ("震惊！这家公司用颠覆认知的方法重写了管理规则。") * 20
+    flags = pre_screen(text)
+    bait = [f for f in flags if f.code == "CLICKBAIT"]
+    assert bait, "标题党词必须被标记"
+    assert bait[0].severity == "hard", "标题党词≥2 视为强信号"
+
+
+def test_pre_screen_flags_thin_soft():
+    """过薄内容应标记，但只是「需谨慎」而非强信号。"""
+    text = "团队管理很重要，要好好带人。"  # <300 字
+    flags = pre_screen(text)
+    assert any(f.code == "THIN" for f in flags), "过薄内容应标记"
+    assert not any(f.severity == "hard" for f in flags), "过薄只是需谨慎，不该短路"
+
+
+def test_pre_screen_flags_no_substance_soft():
+    """纯感悟口号（无数字/年份/方法/引用，句短）应有「无实质」标记。"""
+    text = ("做人要懂得包容他人。" * 30)
+    flags = pre_screen(text)
+    assert any(f.code == "NO_SUBSTANCE" for f in flags), "纯感悟口号应有「无实质」标记"
+    assert not any(f.severity == "hard" for f in flags)
+
+
+def test_pre_screen_flags_content_farm_soft():
+    """句式重复堆砌应标记低质聚合。"""
+    text = ("你一定要知道管理的重要性，否则团队会散。") * 30
+    flags = pre_screen(text)
+    assert any(f.code == "CONTENT_FARM" for f in flags), "句式重复堆砌应标记低质聚合"
+    assert not any(f.severity == "hard" for f in flags)
+
+
+def test_pre_screen_clean_article_has_no_flags():
+    """有方法/年份/引用的扎实文章不应被误伤。
+
+    关键：句句不同（不重复），否则「句式重复≥3次」的低质聚合标记会正确命中。
+    """
+    text = (
+        "目标管理由 Drucker 在 1954 年提出，核心是上下级共同制定可衡量的目标。\n"
+        "SMART 模型要求目标具体、可衡量、可实现、相关、有时限。\n"
+        "一项 2019 年的实证研究显示，纳入反馈机制能显著提升交付准时率。\n"
+        "管理者应据此设计季度复盘流程，而非仅做年终考核。\n"
+        "情境领导由 Hersey 与 Blanchard 提出，主张按准备度调整风格。\n"
+        "路径-目标理论指出领导者要帮助下属清除达成目标的障碍。\n"
+        "权变理论提醒我们，不存在普遍最优的领导方式，风格须匹配情境。\n"
+        "目标管理与关键结果法（OKR）在硅谷被广泛用于对齐战略与执行。\n"
+        "一项对照实验发现，授权程度与下属成熟度匹配时绩效最高。\n"
+        "复盘机制能够让团队把经验转化为可复用的流程资产。\n"
+        "高绩效团队普遍建立了心理安全感，使成员敢于暴露问题。\n"
+        "领导力发展不是听课，而是在真实任务中刻意练习并拿到反馈。"
+    )
+    assert pre_screen(text) == [], "有方法/年份/引用的扎实文章不应被误伤"
+
+
+class _SpyLLM:
+    """complete_json 一旦被调用就抛错——用于验证短路路径确实没调模型。"""
+
+    name = "spy-llm"
+
+    def complete_json(self, purpose, system, user, fallback):
+        raise AssertionError("短路路径不应调用 LLM")
+
+    def complete(self, purpose, system, user):
+        raise AssertionError("短路路径不应调用 LLM")
+
+
+def test_short_circuit_skips_llm_on_hard_flag():
+    """强软文必须短路：不调 LLM，直接判放弃。"""
+    text = ("关于领导的几点感悟，字。") * 30 + "点击下方链接立即购买课程，扫码加我微信领优惠。"
+    a = analyze_article(text, ArticleSource.PASTE, _SpyLLM(), retriever=None)
+    assert a.verdict == "DISCARD", "强软文必须判放弃"
+    assert a.feasible is False
+    assert any(f.code == "SOFT_SELL" for f in a.value_flags)
+    assert a.warnings, "应提示已跳过深度解析"
+
+
+def test_verdict_course_when_clean():
+    """干净扎实的文章应判可成课、且无任何价值标记。"""
+    text = (
+        "情境领导由 Hersey 与 Blanchard 提出，主张按准备度调整风格。\n"
+        "研究（2018）显示准备度由能力与意愿两维构成。\n"
+        "领导者需据此选择指导或授权行为，而非一刀切。\n"
+        "路径-目标理论指出领导者要清除下属达成目标的障碍。\n"
+        "目标管理由 Drucker 在 1954 年提出，强调上下级共定目标。\n"
+        "SMART 模型要求目标具体、可衡量、可实现、相关、有时限。\n"
+        "实证研究表明，纳入反馈机制能提升交付准时率。\n"
+        "权变理论提醒不存在普遍最优的领导方式。\n"
+        "高绩效团队普遍建立了心理安全感，使成员敢于暴露问题。\n"
+        "领导力发展是在真实任务中刻意练习并拿到反馈。\n"
+        "一项 2020 年的元分析支持了情境匹配假设。\n"
+        "管理者应据此设计季度复盘，而非仅做年终考核。\n"
+        "教练式对话通过提问激发下属自己找到答案，而不是给指令。\n"
+        "跨部门协同的有效性取决于共同目标与清晰的责任边界。"
+    )
+    a = analyze_article(text, ArticleSource.PASTE, _FakeLLM(_GOOD_PAYLOAD), retriever=None)
+    assert a.verdict == "COURSE", "干净扎实的文章应判可成课"
+    assert a.value_flags == []
+
+
+def test_verdict_caution_with_soft_flags():
+    """可成课但有价值风险（过薄/无实质）应判需谨慎。"""
+    text = ("管理要用心，带人要坦诚。") * 20  # <300 字 → THIN；且句短无实质 → NO_SUBSTANCE
+    a = analyze_article(text, ArticleSource.PASTE, _FakeLLM(_GOOD_PAYLOAD), retriever=None)
+    assert a.feasible is True
+    assert a.verdict == "CAUTION", "可成课但有价值风险应判需谨慎"
+    assert any(f.severity == "soft" for f in a.value_flags)
+
+
+def test_verdict_mapping_is_exhaustive():
+    """_verdict 三态映射不漏边界。"""
+    f_hard = [ValueFlag(code="SOFT_SELL", label="x", severity="hard", detail="")]
+    f_soft = [ValueFlag(code="THIN", label="x", severity="soft", detail="")]
+    assert _verdict(False, [])[0] == "DISCARD"
+    assert _verdict(True, f_hard)[0] == "DISCARD"
+    assert _verdict(True, f_soft)[0] == "CAUTION"
+    assert _verdict(True, [])[0] == "COURSE"

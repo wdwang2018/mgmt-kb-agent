@@ -181,6 +181,31 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
 .ana-rel{font-size:12px;color:var(--text-3);line-height:1.7;margin-bottom:10px}
 .ana-act{display:flex;gap:8px;flex-wrap:wrap}
 
+/* —— 内容价值判断层（基本判断横幅 + 标记 chips）—— */
+.ana-verdict{
+  display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
+  padding:9px 12px;border-radius:var(--r-sm);margin-bottom:12px;
+  border:1px solid var(--rule-2);background:var(--paper-2);
+}
+.ana-verdict .v-label{font-weight:600;font-size:13.5px;letter-spacing:.02em}
+.ana-verdict .v-sub{font-size:12px;color:var(--text-2);line-height:1.5}
+.ana-verdict.is-course{border-color:var(--verde);background:var(--verde-soft)}
+.ana-verdict.is-course .v-label{color:var(--verde)}
+.ana-verdict.is-caution{border-color:var(--ochre);background:var(--ochre-soft)}
+.ana-verdict.is-caution .v-label{color:var(--ochre)}
+.ana-verdict.is-discard{border-color:var(--brick);background:var(--brick-soft)}
+.ana-verdict.is-discard .v-label{color:var(--brick)}
+.ana-flags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.ana-flag{
+  font-size:11.5px;padding:2px 8px;border-radius:var(--r-xs);
+  border:1px solid var(--rule-2);background:var(--paper);color:var(--text-2);
+  cursor:help;
+}
+.ana-flag.is-hard{border-color:var(--brick);color:var(--brick);background:var(--brick-soft)}
+.ana-flag.is-soft{border-color:var(--ochre);color:var(--ochre);background:var(--ochre-soft)}
+.ana-fill-block{font-size:12.5px;color:var(--text-2);line-height:1.6;
+  padding:8px 10px;border-left:2px solid var(--brick);background:var(--brick-soft)}
+
 .result-area{display:flex;flex-direction:column;gap:14px;min-height:400px}
 .empty-hint{color:var(--text-2);text-align:center;padding:60px 20px;border-style:dashed}
 .empty-hint .big{font-size:15px;color:var(--text);margin-bottom:6px;font-weight:600}
@@ -1318,9 +1343,37 @@ async function renderAnalysis(a) {
     : "未在库内命中可引用的知识单元（不影响成课，只是本次无现成内容可复用）";
   const warns = (a.warnings || []).map((w) => `<div class="ana-tip is-no">${esc(w)}</div>`).join("");
 
+  // —— 基本判断横幅（文章一进来先给结论，早揪伪干货）——
+  const v = a.verdict || "COURSE";
+  const vSub = {
+    COURSE: "内容具备成课基础",
+    CAUTION: "可成课，但存在价值风险，请人工复核",
+    DISCARD: "疑似软文/标题党或不可成课，建议放弃",
+  }[v] || "";
+  const verdictBanner = `
+    <div class="ana-verdict is-${v.toLowerCase()}">
+      <span class="v-label">基本判断：${esc(a.verdict_label || "可成课")}</span>
+      <span class="v-sub">${esc(vSub)}</span>
+    </div>`;
+  const flagsHtml = (a.value_flags || []).length
+    ? `<div class="ana-flags">${(a.value_flags || []).map((f) =>
+        `<span class="ana-flag is-${f.severity}" title="${esc(f.detail || "")}">${esc(f.label)}</span>`).join("")}</div>`
+    : "";
+
+  // 判为放弃时，不提供「填入需求单」——避免把软文当课程素材
+  const canFill = v !== "DISCARD";
+  const actBlock = canFill
+    ? `<div class="ana-act">
+         <button type="button" class="btn btn-sm btn-primary" id="btn-src-fill">填入需求单</button>
+         <button type="button" class="btn btn-sm" id="btn-src-close">收起</button>
+       </div>`
+    : `<div class="ana-fill-block">已判为「放弃」，不提供「填入需求单」，以免把软文/标题党当课程素材。</div>`;
+
   $("src-result").innerHTML = `
     <div class="ana">
       <div class="ana-title">${esc(a.title)}</div>
+      ${verdictBanner}
+      ${flagsHtml}
       ${warns}
       <ol class="ana-sum">${sums}</ol>
       <div class="ana-meta">${tags.join("")}</div>
@@ -1329,17 +1382,15 @@ async function renderAnalysis(a) {
       </div>
       ${facts.length ? `<div class="ana-facts">${facts.join(" · ")}</div>` : ""}
       <div class="ana-rel">${rel}</div>
-      <div class="ana-act">
-        <button type="button" class="btn btn-sm btn-primary" id="btn-src-fill">填入需求单</button>
-        <button type="button" class="btn btn-sm" id="btn-src-close">收起</button>
-      </div>
+      ${actBlock}
     </div>`;
   $("src-result").classList.remove("hidden");
 
   $("btn-src-close").onclick = () => {
     $("src-result").classList.add("hidden");
   };
-  $("btn-src-fill").onclick = () => {
+  const fillBtn = $("btn-src-fill");
+  if (fillBtn) fillBtn.onclick = () => {
     // 与后端 fill_training_need 同规则：有值才覆盖，没有就保留用户手填
     if (a.audience_reco) $("f-audience").value = a.audience_reco;
     if (a.suggested_level) $("f-level").value = String(a.suggested_level);

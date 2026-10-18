@@ -15,10 +15,11 @@ from __future__ import annotations
 
 import json
 import re
+from collections import Counter
 from typing import Any
 
 from ..domain.constants import COMPETENCY_DOMAINS, COURSE_TYPES, DILEMMA_INDEX, THEORY_LINEAGE
-from ..domain.models import ArticleAnalysis, ArticleSource
+from ..domain.models import ArticleAnalysis, ArticleSource, ValueFlag, Verdict
 from ..ports import LLMClient, Retriever
 
 PURPOSE = "analyze_article"
@@ -77,6 +78,160 @@ _USER = """请用下面的正文做判断。
 # 内容去做关键词命中与摘要，产出「摘要里混着代码清单」的荒唐结果。
 _BODY_START = "【正文】"
 _BODY_END = "【正文结束】"
+
+
+# ---------------------------------------------------------------------------
+# 内容价值判断层（P6+）：文章一进来先跑零成本规则预筛，
+# 尽早揪出「软文 / 哗众取宠 / 无实际价值」，避免把时间浪费在伪干货上。
+#
+# 设计要点：
+# 1. 纯正则 + 简单统计，不调用任何模型，毫秒级；离线(Mock)环境下也完全可用。
+#    早判的意义就是"不浪费时间"——若靠 LLM 判断就失去了"早"的价值。
+# 2. 每个标记带 severity：hard=建议放弃（调用方可据此短路、不调 LLM）；
+#    soft=需谨慎（仍跑 LLM，但结论标 CAUTION 让用户复核）。
+# 3. 不掩盖：软文也可能碰巧讲对一句，故 hard 标记同时附 detail 让用户复核。
+# ---------------------------------------------------------------------------
+_SOFT_SELL_HARD = [
+    "立即购买", "限时优惠", "限时特惠", "扫码", "二维码", "加我微信", "加微信",
+    "添加客服", "客服微信", "私信我", "关注公众号", "报名咨询", "课程顾问",
+    "抢名额", "免费领取", "0元", "点击下方", "回复暗号", "领取资料", "添加老师",
+]
+_PRICE_RE = re.compile(r"[¥$￥]\s*\d|\d+\s*元|元\s*（|元/|万元|千元|￥\d")
+_PHONE_RE = re.compile(r"(?<!\d)(1[3-9]\d{9})(?!\d)")
+_EMAIL_RE = re.compile(r"[A-Za-z0-9_.+-]+@[A-Za-z0-9-]+\.[A-Za-z0-9-.]+")
+
+_CLICKBAIT_WORDS = [
+    "震惊", "揭秘", "颠覆认知", "不可思议", "99%的人", "90%的人", "必看", "速看",
+    "再不看", "删前必读", "突发", "看完秒懂", "这才是", "别再", "所有人都错了",
+    "真相", "内部", "干货", "惊呆", "不敢相信", "万万没想到", "颠覆", "竟然",
+    "原来如此", "一招", "速收藏", "炸锅", "刷屏", "朋友圈疯传", "沸腾", "深度好文",
+]
+_METHOD_WORDS = ["模型", "框架", "步骤", "方法", "清单", "原则", "公式", "流程",
+                 "标准", "指标", "SOP", "机制", "策略", "工具", "量表", "维度", "评估"]
+_CITE_WORDS = ["研究", "实证", "据", "《", "》", "教授", "博士", "作者", "实验", "数据",
+               "调查", "报告", "meta", "Meta", "论文", "期刊"]
+_FARM_WORDS = ["你一定要知道", "人生感悟", "别让", "余生", "格局", "认知", "底层逻辑",
+               "开窍", "醒悟", "通透", "活法", "赢家", "穷人思维", "富人思维"]
+
+
+def _effective_len(text: str) -> int:
+    """去除空白后的有效字符数（过薄判定用）。"""
+    return len(re.sub(r"\s+", "", text))
+
+
+def _split_sentences(text: str) -> list[str]:
+    return [s.strip() for s in re.split(r"[。！？!?\n]+", text) if s.strip()]
+
+
+def _cheap_title(text: str) -> str:
+    for line in text.split("\n"):
+        line = line.strip()
+        if line:
+            return line[:40]
+    return "（未能识别标题）"
+
+
+def _cheap_summary(text: str) -> list[str]:
+    sents = _split_sentences(text)[:3]
+    return [re.sub(r"\s+", " ", s).strip()[:120] for s in sents if s.strip()]
+
+
+def pre_screen(text: str) -> list[ValueFlag]:
+    """零成本规则预筛：返回命中的内容价值标记（可能为空）。
+
+    刻意做成纯规则、不依赖 LLM。每个标记附 detail 便于用户复核，避免误杀。
+    """
+    flags: list[ValueFlag] = []
+    if not text or not text.strip():
+        return flags
+
+    n = _effective_len(text)
+    sents = _split_sentences(text)
+    n_sent = max(1, len(sents))
+    exclaim = text.count("！") + text.count("!")
+    question = text.count("？") + text.count("?")
+    exclaim_ratio = exclaim / n_sent
+    q_density = question / max(1, n / 100.0)
+
+    # —— 软文 / 营销导流（hard）——
+    hit_soft = [w for w in _SOFT_SELL_HARD if w in text]
+    if hit_soft or _PRICE_RE.search(text) or _PHONE_RE.search(text) or _EMAIL_RE.search(text):
+        detail = "命中营销导流信号：" + "、".join(hit_soft[:4])
+        if _PRICE_RE.search(text):
+            detail += "、含价格/金额"
+        if _PHONE_RE.search(text) or _EMAIL_RE.search(text):
+            detail += "、含联系方式"
+        flags.append(ValueFlag(code="SOFT_SELL", label="软文/营销导流",
+                               severity="hard", detail=detail[:120]))
+
+    # —— 哗众取宠 / 标题党 ——
+    bait = [w for w in _CLICKBAIT_WORDS if w in text]
+    if len(bait) >= 2 or exclaim_ratio > 0.05:
+        sev: str = "hard"
+    elif bait or q_density > 3:
+        sev = "soft"
+    else:
+        sev = ""
+    if sev:
+        d = []
+        if bait:
+            d.append("标题党词：" + "、".join(bait[:4]))
+        if exclaim_ratio > 0.05:
+            d.append(f"感叹句占比 {exclaim_ratio:.0%}")
+        if q_density > 3:
+            d.append(f"问号密度 {q_density:.1f}/百字")
+        flags.append(ValueFlag(code="CLICKBAIT", label="哗众取宠/标题党",
+                               severity=sev, detail="；".join(d)[:120]))
+
+    # —— 内容过薄（soft）——
+    if n < 300:
+        flags.append(ValueFlag(code="THIN", label="内容过薄",
+                               severity="soft", detail=f"有效正文仅 {n} 字，不足支撑 60 分钟课程"))
+
+    # —— 无实质 / 纯感悟煽动（soft）——
+    has_num = bool(re.search(r"\d", text))
+    has_year = bool(re.search(r"(19|20)\d{2}", text))
+    has_method = any(w in text for w in _METHOD_WORDS)
+    has_cite = any(w in text for w in _CITE_WORDS)
+    avg_len = n / n_sent
+    if not (has_num or has_year or has_method or has_cite) and (exclaim_ratio > 0.2 or avg_len < 14):
+        detail = "缺乏可验证的实质内容（无数字/年份/方法/引用）"
+        if exclaim_ratio > 0.2:
+            detail += f"，且感叹句占比偏高（{exclaim_ratio:.0%}）"
+        if avg_len < 14:
+            detail += "，句长偏短、像口号堆砌"
+        flags.append(ValueFlag(code="NO_SUBSTANCE", label="无实质内容",
+                               severity="soft", detail=detail[:120]))
+
+    # —— 低质聚合（soft）——
+    farm = [w for w in _FARM_WORDS if text.count(w) >= 2]
+    norm = [re.sub(r"\s+", "", s) for s in sents]
+    rep = [s for s, c in Counter(norm).items() if c >= 3 and len(s) >= 6]
+    listy = len(re.findall(r"第\s*[一二三四五六七八九十\d]+\s*[点条步课]", text))
+    if farm or rep or listy >= 6:
+        d = []
+        if farm:
+            d.append("套路词重复：" + "、".join(farm[:3]))
+        if rep:
+            d.append(f"句式重复≥3次（如「{rep[0][:20]}…」）")
+        if listy >= 6:
+            d.append(f"「第N点」式堆砌 {listy} 处")
+        flags.append(ValueFlag(code="CONTENT_FARM", label="低质聚合",
+                               severity="soft", detail="；".join(d)[:120]))
+
+    return flags
+
+
+def _verdict(feasible: bool, flags: list[ValueFlag]) -> tuple[str, str]:
+    """三态基本判断：DISCARD / CAUTION / COURSE（返回 code + 中文标签）。"""
+    if not feasible:
+        return Verdict.DISCARD.value, "建议放弃"
+    if any(f.severity == "hard" for f in flags):
+        return Verdict.DISCARD.value, "建议放弃"
+    if any(f.severity == "soft" for f in flags):
+        return Verdict.CAUTION.value, "需谨慎"
+    return Verdict.COURSE.value, "可成课"
+
 
 
 def _fallback() -> dict[str, Any]:
@@ -236,6 +391,33 @@ def analyze_article(
     intake_warnings: list[str] | None = None,
 ) -> ArticleAnalysis:
     """解析一篇文章。text 为摄入后的正文（可能是截断过的）。"""
+    text = text or ""
+
+    # —— 内容价值判断层（先行、零成本）——
+    # 强信号（强软文/标题党）直接短路，不调 LLM，把"不浪费时间"落到实处。
+    flags = pre_screen(text)
+    if any(f.severity == "hard" for f in flags):
+        verdict, verdict_label = _verdict(False, flags)
+        return ArticleAnalysis(
+            source=source,
+            title=_cheap_title(text),
+            summary=_cheap_summary(text),
+            core_concepts=[],
+            domains=[], dilemmas=[], lineages=[],
+            evidence_level="C",
+            feasible=False,
+            feasibility_reason="命中强软文/标题党信号，建议放弃，不投入成课（详见下方标记）",
+            course_type="MICRO",
+            related_units=[],
+            audience_reco="", suggested_theme="", suggested_pain="",
+            suggested_behavior="",
+            suggested_duration=None, suggested_headcount=None, suggested_level=None,
+            value_flags=flags,
+            verdict=verdict, verdict_label=verdict_label,
+            warnings=["疑似软文/标题党，已跳过深度解析以节省时间"],
+            raw_chars=len(text),
+        )
+
     user = _USER.format(
         domains=", ".join(COMPETENCY_DOMAINS),
         dilemmas=", ".join(DILEMMA_INDEX),
@@ -292,6 +474,12 @@ def analyze_article(
     # 关联知识单元：优先按标签双路召回，再按核心概念文本检索补齐
     analysis.related_units = _find_related_units(analysis, retriever)
 
+    # 贴上内容价值标记与基本判断
+    analysis.value_flags = flags
+    verdict, verdict_label = _verdict(feasible, flags)
+    analysis.verdict = verdict
+    analysis.verdict_label = verdict_label
+
     warns = list(intake_warnings or [])
     if not summary:
         warns.append("解析未产出要点，结论不可用，建议换用在线模型或人工判断")
@@ -299,6 +487,9 @@ def analyze_article(
         warns.append("证据等级为 C（经验流派），成课时须标明观点来源、不可当作实证结论讲授")
     if feasible and not domains:
         warns.append("未命中任何能力域，课程定位可能不清晰")
+    soft_labels = [f.label for f in flags if f.severity == "soft"]
+    if soft_labels:
+        warns.append("内容价值判断：命中「" + "、".join(soft_labels) + "」，成课前请人工复核其实质价值")
     analysis.warnings = warns
     return analysis
 
