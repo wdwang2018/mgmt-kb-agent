@@ -8,6 +8,10 @@
 - GET  /api/v1/runs/{run_id}            查询运行状态
 - GET  /api/v1/runs/{run_id}/package.md 下载课程包 Markdown
 - GET  /api/v1/runs/{run_id}/materials 课前预热物料一键导出（Word+PPT+PDF 打包 zip）
+- POST /api/v1/kb/chat                知识库对话问答（只答库内、可溯源）
+- POST /api/v1/runs/{run_id}/quiz     从课程包生成测验题库（落盘 quiz.json）
+- POST /api/v1/runs/{run_id}/quiz/submit  提交作答，规则化自动评分
+- POST /api/v1/runs/{run_id}/operations  从课程包生成运营包（招生/课前/课后 30-60-90）
 - GET  /api/v1/kb/units                 知识单元检索（域/困境/关键词）
 - GET  /api/v1/archetypes               课程原型列表
 - POST /api/v1/kb/ingest                提交语料，跑知识流水线（P1）
@@ -30,12 +34,16 @@ from fastapi.responses import PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from ..domain.models import ArticleSource, CoursePackage, TrainingNeed
+from ..domain.models import (ArticleSource, CoursePackage, OperationsPlan,
+                             QuizItem, TrainingNeed)
 from ..domain.constants import COURSE_TYPES, THEORY_LINEAGE
 from ..services.article_analyzer import analyze_article as _analyze_article
 from ..services.article_intake import (IntakeError, intake_bytes, intake_paste,
                                        intake_url)
 from ..services.course_materials import build_brochure, build_materials_zip
+from ..services.kb_chat import chat_kb as _chat_kb
+from ..services.quiz import generate_quiz as _generate_quiz, grade_quiz as _grade_quiz
+from ..services.operations import generate_operations as _generate_operations
 from ..observability.metrics import metrics
 from ..services.context import AppContext, build_context
 from .observability import install_observability, observability_config_from_env
@@ -469,6 +477,98 @@ async def analyze_article_file(file: UploadFile = File(...)):
         raise HTTPException(_INTAKE_STATUS.get(e.code, 422),
                             f"[{e.code}] {e.message}") from e
     return _analysis_payload(_analyze_article(text, ArticleSource.FILE, c.llm, c.retriever, warns))
+
+
+# ---------------------------------------------------------------------------
+# 知识库对话问答（#1）：自然语言提问 → 只答库内、可溯源
+# ---------------------------------------------------------------------------
+class ChatBody(BaseModel):
+    question: str = Field(description="讲师的自然语言提问")
+    top_k: int = Field(default=5, ge=1, le=10)
+    domain: str | None = Field(default=None, description="限定能力域（可选）")
+    dilemma: str | None = Field(default=None, description="限定困境（可选）")
+
+
+@app.post("/api/v1/kb/chat")
+def kb_chat(body: ChatBody):
+    """知识库问答：检索相关知识单元后作答，答案附可溯源引用。
+
+    与通用问答的区别：只答库内（检索不到就说「库内暂无」），不编造。
+    """
+    c = _ctx()
+    r = _chat_kb(
+        body.question, c.retriever, c.llm, top_k=body.top_k,
+        domains=[body.domain] if body.domain else None,
+        dilemmas=[body.dilemma] if body.dilemma else None,
+    )
+    return {"answer": r.answer, "sources": [s.model_dump() for s in r.sources]}
+
+
+# ---------------------------------------------------------------------------
+# 测验题库（#2）：从课程包生成题库 + 提交后规则化自动评分
+# ---------------------------------------------------------------------------
+def _load_package(c: AppContext, run_id: str) -> CoursePackage:
+    """读取已落盘 package.json（多个"由课程包派生"的端点共用）。"""
+    pkg_file = c.output_dir / run_id / "package.json"
+    if not pkg_file.exists():
+        raise HTTPException(404, "课程包尚未生成（流水线未完成）")
+    try:
+        return CoursePackage.model_validate(json.loads(pkg_file.read_text(encoding="utf-8")))
+    except Exception as e:
+        raise HTTPException(500, f"课程包读取失败：{e}") from e
+
+
+@app.post("/api/v1/runs/{run_id}/quiz")
+def create_quiz(run_id: str):
+    """从课程包生成题库并落盘 quiz.json（供后续提交评分复用）。"""
+    c = _ctx()
+    pkg = _load_package(c, run_id)
+    try:
+        items = _generate_quiz(pkg, c.llm)
+    except Exception as e:
+        raise HTTPException(500, f"题库生成失败：{e}") from e
+    (c.output_dir / run_id / "quiz.json").write_text(
+        json.dumps({"items": [it.model_dump() for it in items]}, ensure_ascii=False),
+        encoding="utf-8")
+    return {"run_id": run_id, "items": [it.model_dump() for it in items]}
+
+
+class QuizSubmitBody(BaseModel):
+    answers: list[int] = Field(default_factory=list, description="逐题选中项下标")
+
+
+@app.post("/api/v1/runs/{run_id}/quiz/submit")
+def submit_quiz(run_id: str, body: QuizSubmitBody):
+    """提交作答，规则化自动评分（读 quiz.json，无需再调 LLM，离线可评）。"""
+    c = _ctx()
+    quiz_file = c.output_dir / run_id / "quiz.json"
+    if not quiz_file.exists():
+        raise HTTPException(404, "尚未生成测验，请先调用生成接口")
+    try:
+        raw = json.loads(quiz_file.read_text(encoding="utf-8"))
+        items = [QuizItem.model_validate(x) for x in raw.get("items", [])]
+    except Exception as e:
+        raise HTTPException(500, f"测验读取失败：{e}") from e
+    result = _grade_quiz(items, body.answers)
+    result["run_id"] = run_id
+    return result
+
+
+# ---------------------------------------------------------------------------
+# 运营包（#3）：从课程包生成对外公开课的招生 / 课前预热 / 课后跟进方案
+# ---------------------------------------------------------------------------
+@app.post("/api/v1/runs/{run_id}/operations")
+def create_operations(run_id: str):
+    """从课程包生成运营包并落盘 operations.json。"""
+    c = _ctx()
+    pkg = _load_package(c, run_id)
+    try:
+        plan = _generate_operations(pkg, c.llm)
+    except Exception as e:
+        raise HTTPException(500, f"运营包生成失败：{e}") from e
+    (c.output_dir / run_id / "operations.json").write_text(
+        json.dumps(plan.model_dump(), ensure_ascii=False), encoding="utf-8")
+    return plan.model_dump()
 
 
 # Web 工作台静态挂载：API 路由均注册在前，优先匹配；其余路径回落 web/index.html

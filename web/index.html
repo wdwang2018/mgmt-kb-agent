@@ -206,6 +206,41 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
 .ana-fill-block{font-size:12.5px;color:var(--text-2);line-height:1.6;
   padding:8px 10px;border-left:2px solid var(--brick);background:var(--brick-soft)}
 
+/* ---------- 知识库问答（#1） ---------- */
+.chat-card h2{margin-bottom:6px}
+.chat-input{display:flex;gap:8px;margin:4px 0 8px}
+.chat-input input{flex:1;padding:8px 12px;border:1px solid var(--rule-2);border-radius:var(--r-sm);background:var(--paper)}
+.chat-note{font-size:12.5px;color:var(--brick);min-height:18px}
+.chat-log{display:flex;flex-direction:column;gap:14px;margin-top:8px}
+.chat-msg{border:1px solid var(--rule);border-radius:var(--r-sm);padding:12px 14px;background:var(--paper)}
+.chat-msg .q{font-weight:600;color:var(--ink);margin-bottom:6px}
+.chat-msg .a{font-size:13.5px;line-height:1.7;white-space:pre-wrap}
+.chat-src{margin-top:8px;padding-top:8px;border-top:1px dashed var(--rule);display:flex;flex-wrap:wrap;gap:6px}
+.chat-src .src-chip{font-size:11.5px;background:var(--primary-soft);color:var(--primary);padding:2px 8px;border-radius:var(--r-xs);cursor:help}
+.chat-empty{font-size:13px;color:var(--text-3);text-align:center;padding:40px 0;border:1px dashed var(--rule);border-radius:var(--r-sm)}
+
+/* ---------- 完成页「测验 / 运营包」交付盒（#2/#3） ---------- */
+.deliv-box{margin-top:16px;border:1px solid var(--rule);border-radius:var(--r-sm);padding:14px 16px;background:var(--paper)}
+.deliv-box h4{font-family:var(--font-serif);font-size:15px;font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.deliv-box .deliv-sub{font-size:12.5px;color:var(--text-2);margin-bottom:12px}
+.deliv-load{font-size:13px;color:var(--text-2);padding:18px 0;text-align:center}
+.qz-item{border:1px solid var(--rule);border-radius:var(--r-xs);padding:10px 12px;margin-bottom:10px;background:var(--paper)}
+.qz-item .qz-stem{font-weight:600;margin-bottom:6px}
+.qz-item .qz-meta{font-size:11.5px;color:var(--text-3);margin-bottom:6px}
+.qz-opts{display:flex;flex-direction:column;gap:4px}
+.qz-opt{display:flex;gap:8px;align-items:flex-start;font-size:13px;padding:4px 6px;border-radius:var(--r-xs);cursor:pointer}
+.qz-opt:hover{background:var(--paper-2)}
+.qz-opt.is-correct{background:var(--verde-soft);color:var(--verde);font-weight:600}
+.qz-opt.is-wrong{background:var(--brick-soft);color:var(--brick)}
+.qz-score{font-size:14px;font-weight:600;margin:10px 0;padding:8px 12px;border-radius:var(--r-xs);background:var(--primary-soft);color:var(--primary)}
+.qz-exp{font-size:12px;color:var(--text-2);margin-top:4px;padding-left:22px}
+.ops-sec{margin-bottom:12px}
+.ops-sec h5{font-size:13px;font-weight:600;color:var(--ink);margin-bottom:6px}
+.ops-sec p,.ops-sec li{font-size:13px;line-height:1.65;color:var(--text)}
+.ops-sec ul{padding-left:20px;margin:0}
+.ops-phase{border-left:2px solid var(--ink);padding:4px 0 4px 12px;margin-bottom:8px}
+.ops-phase .ph-goal{font-size:12.5px;color:var(--text-2);margin-bottom:4px}
+
 .result-area{display:flex;flex-direction:column;gap:14px;min-height:400px}
 .empty-hint{color:var(--text-2);text-align:center;padding:60px 20px;border-style:dashed}
 .empty-hint .big{font-size:15px;color:var(--text);margin-bottom:6px;font-weight:600}
@@ -429,6 +464,10 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
       知识库
     </button>
+    <button class="nav-item" data-tab="kbchat">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+      知识库问答
+    </button>
     <button class="nav-item" data-tab="runs">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
       运行记录
@@ -584,11 +623,15 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
                 <button class="btn btn-sm" id="btn-again">重新生成</button>
                 <button class="btn btn-sm btn-primary" id="btn-download">下载 Markdown</button>
                 <button class="btn btn-sm" id="btn-warmup">一键生成预热物料</button>
+                <button class="btn btn-sm" id="btn-quiz">生成测验</button>
+                <button class="btn btn-sm" id="btn-ops">生成运营包</button>
               </div>
             </div>
             <div class="stat-row" id="done-stats"></div>
             <div class="gate-row" id="done-gates"></div>
             <div class="md-paper" id="md-view"></div>
+            <div id="quiz-box" class="deliv-box hidden"></div>
+            <div id="ops-box" class="deliv-box hidden"></div>
           </div>
 
           <div id="res-failed" class="card hidden">
@@ -624,7 +667,21 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
       <div id="kb-graph" class="kb-graph hidden"></div>
     </section>
 
-    <!-- ============ Tab 3：运行记录 ============ -->
+    <!-- ============ Tab 3：知识库问答 ============ -->
+    <section id="tab-kbchat" class="tab">
+      <div class="card chat-card">
+        <h2>知识库问答 <span class="tag">只答库内 · 可溯源</span></h2>
+        <p class="form-tip">用自然语言向知识库提问，助手只依据库内知识单元作答，并附上「作者《书名》章节」来源。检索不到会如实告知，不会编造。</p>
+        <div class="chat-input">
+          <input id="chat-q" aria-label="向知识库提问" placeholder="例如：新任经理最常见的授权误区有哪些？ / 什么是 GROW 模型？">
+          <button class="btn btn-primary" id="btn-chat">提问</button>
+        </div>
+        <div class="chat-note" id="chat-note"></div>
+        <div id="chat-log" class="chat-log"><div id="chat-empty" class="chat-empty">向知识库提问，回答将显示在这里，并附「作者《书名》章节」来源。</div></div>
+      </div>
+    </section>
+
+    <!-- ============ Tab 4：运行记录 ============ -->
     <section id="tab-runs" class="tab">
       <div class="card">
         <table class="runs-table">
@@ -643,7 +700,7 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
         <div class="md-paper" id="run-detail-md"></div>
       </div>
     </section>
-    <!-- ============ Tab 4：知识流水线（P1） ============ -->
+    <!-- ============ Tab 5：知识流水线（P1） ============ -->
     <section id="tab-kbpipe" class="tab">
       <div class="kbpipe-grid">
         <form id="corpus-form" class="card form-card">
@@ -735,7 +792,7 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
       </div>
     </section>
 
-    <!-- ============ Tab 5：TOKEN 消耗 ============ -->
+    <!-- ============ Tab 6：TOKEN 消耗 ============ -->
     <section id="tab-tokens" class="tab">
       <div class="card">
         <div class="done-head">
@@ -866,7 +923,7 @@ document.querySelectorAll(".nav-item").forEach((btn) => {
   };
 });
 
-/* ==================== Tab 4：知识流水线（P1） ==================== */
+/* ==================== Tab 5：知识流水线（P1） ==================== */
 const KB_STEPS = ["ingest_corpus", "extract_draft", "validate_draft", "human_review", "commit_draft"];
 const KB_STEP_NAMES = { ingest_corpus: "采集落 L1", extract_draft: "加工抽取", validate_draft: "K1-K5 质检", human_review: "人工审核", commit_draft: "编号入库" };
 let kbCurrentRun = null;
@@ -1511,6 +1568,155 @@ $("btn-warmup").onclick = async () => {
 $("btn-again").onclick = () => show("res-empty");
 $("btn-retry").onclick = () => show("res-empty");
 
+/* ==================== 知识库问答（#1） ==================== */
+async function chatAsk() {
+  const q = $("chat-q").value.trim();
+  const note = $("chat-note"), log = $("chat-log");
+  note.textContent = "";
+  if (!q) { note.textContent = "请先输入问题"; return; }
+  const empty = $("chat-empty");
+  if (empty) empty.remove();
+  // 乐观插入提问气泡（检索+作答期间显示 loading）
+  const bubble = document.createElement("div");
+  bubble.className = "chat-msg";
+  bubble.innerHTML = `<div class="q">${esc(q)}</div><div class="deliv-load">检索库内知识并作答中…</div>`;
+  log.prepend(bubble);
+  try {
+    const r = await api("/api/v1/kb/chat", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: q }),
+    });
+    const d = await r.json();
+    const srcs = (d.sources || []).map((s) =>
+      `<span class="src-chip" title="${esc(s.snippet || "")}">${esc(s.citation || s.title || s.unit_id)}</span>`).join("");
+    bubble.innerHTML = `<div class="q">${esc(q)}</div><div class="a">${esc(d.answer || "")}</div>` +
+      (srcs ? `<div class="chat-src">${srcs}</div>` : "");
+  } catch (e) {
+    bubble.innerHTML = `<div class="q">${esc(q)}</div><div class="a" style="color:var(--brick)">提问失败：${esc((e && e.message) || e)}</div>`;
+  }
+}
+$("btn-chat").onclick = chatAsk;
+$("chat-q").addEventListener("keydown", (e) => { if (e.key === "Enter") chatAsk(); });
+
+/* ==================== 测验题库 + 自动评分（#2） ==================== */
+let lastQuiz = [];      // 最近一次生成的题库（含 answer_index / explanation）
+let quizAnswers = [];   // 每题选中项下标，未选为 -1
+
+$("btn-quiz").onclick = async () => {
+  if (!currentRun) return;
+  const box = $("quiz-box");
+  box.classList.remove("hidden");
+  box.innerHTML = `<h4>课前 / 课后测验</h4><div class="deliv-sub">由课程包派生，闭卷单选，提交后自动评分并逐题回显解析。</div><div class="deliv-load">生成中…</div>`;
+  try {
+    const r = await api("/api/v1/runs/" + encodeURIComponent(currentRun.run_id) + "/quiz", { method: "POST" });
+    const d = await r.json();
+    lastQuiz = d.items || [];
+    renderQuiz(lastQuiz);
+  } catch (e) {
+    box.innerHTML = `<h4>课前 / 课后测验</h4><div class="deliv-load" style="color:var(--brick)">生成失败：${esc((e && e.message) || e)}</div>`;
+  }
+};
+
+function renderQuiz(items) {
+  const box = $("quiz-box");
+  quizAnswers = items.map(() => -1);
+  const html = items.map((q, i) => {
+    const opts = (q.options || []).map((o, j) =>
+      `<label class="qz-opt" data-i="${i}" data-j="${j}"><input type="radio" name="qz-${i}" value="${j}" ${quizAnswers[i] === j ? "checked" : ""}> ${esc(o)}</label>`).join("");
+    const meta = [`模块 ${esc(q.module_id || "-")}`, `Bloom L${q.bloom}`];
+    if (q.unit_ids && q.unit_ids.length) meta.push("关联 " + esc(q.unit_ids.join("、")));
+    return `<div class="qz-item" id="qz-item-${i}">
+      <div class="qz-stem">${i + 1}. ${esc(q.stem)}</div>
+      <div class="qz-meta">${meta.join(" · ")}</div>
+      <div class="qz-opts">${opts}</div>
+    </div>`;
+  }).join("");
+  box.innerHTML = `<h4>课前 / 课后测验</h4>
+    <div class="deliv-sub">闭卷单选，共 ${items.length} 题。选择答案后提交，自动评分并显示解析。</div>
+    ${html}
+    <button class="btn btn-primary btn-sm" id="btn-quiz-submit">提交评分</button>`;
+  box.querySelectorAll(".qz-opt").forEach((label) => {
+    label.onclick = () => {
+      quizAnswers[+label.dataset.i] = +label.dataset.j;
+      const radio = label.querySelector("input");
+      if (radio) radio.checked = true;
+    };
+  });
+  $("btn-quiz-submit").onclick = submitQuiz;
+}
+
+async function submitQuiz() {
+  if (!currentRun) return;
+  try {
+    const r = await api("/api/v1/runs/" + encodeURIComponent(currentRun.run_id) + "/quiz/submit", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answers: quizAnswers }),
+    });
+    const d = await r.json();
+    (d.detail || []).forEach((row) => {
+      const item = $("qz-item-" + row.index);
+      if (!item) return;
+      const opts = item.querySelectorAll(".qz-opt");
+      opts.forEach((l) => { l.classList.remove("is-correct", "is-wrong"); l.style.pointerEvents = "none"; });
+      if (row.answer_index != null && opts[row.answer_index]) opts[row.answer_index].classList.add("is-correct");
+      if (!row.correct && row.selected >= 0 && opts[row.selected]) opts[row.selected].classList.add("is-wrong");
+    });
+    // 解析回显（评分后不再隐藏答案）
+    lastQuiz.forEach((q, i) => {
+      const item = $("qz-item-" + i);
+      if (item && q.explanation && !item.querySelector(".qz-exp")) {
+        const exp = document.createElement("div");
+        exp.className = "qz-exp";
+        exp.textContent = "解析：" + q.explanation;
+        item.appendChild(exp);
+      }
+    });
+    const box = $("quiz-box");
+    const old = box.querySelector(".qz-score");
+    if (old) old.remove();
+    const score = document.createElement("div");
+    score.className = "qz-score";
+    score.textContent = `得分：${d.score} / ${d.total}（${d.percent}%）`;
+    box.insertBefore(score, $("btn-quiz-submit"));
+    $("btn-quiz-submit").disabled = true;
+    $("btn-quiz-submit").textContent = "已评分";
+  } catch (e) {
+    alert("评分失败：" + ((e && e.message) || e));
+  }
+}
+
+/* ==================== 运营包（#3） ==================== */
+$("btn-ops").onclick = async () => {
+  if (!currentRun) return;
+  const box = $("ops-box");
+  box.classList.remove("hidden");
+  box.innerHTML = `<h4>运营包 <span class="tag">对外公开课</span></h4><div class="deliv-load">生成中…</div>`;
+  try {
+    const r = await api("/api/v1/runs/" + encodeURIComponent(currentRun.run_id) + "/operations", { method: "POST" });
+    const d = await r.json();
+    renderOps(d);
+  } catch (e) {
+    box.innerHTML = `<h4>运营包</h4><div class="deliv-load" style="color:var(--brick)">生成失败：${esc((e && e.message) || e)}</div>`;
+  }
+};
+
+function renderOps(o) {
+  const box = $("ops-box");
+  const sp = (o.selling_points || []).map((s) => `<li>${esc(s)}</li>`).join("");
+  const pc = (o.promotion_channels || []).map((c) =>
+    `<li><b>${esc(c.channel)}</b>：${esc(c.method)}${c.fit ? ` <span style="color:var(--text-3)">（${esc(c.fit)}）</span>` : ""}</li>`).join("");
+  const pre = (o.pre_class_prep || []).map((s) => `<li>${esc(s)}</li>`).join("");
+  const fu = (o.post_class_followup || []).map((f) =>
+    `<div class="ops-phase"><div class="ph-goal"><b>${esc(f.phase)} 天</b> · ${esc(f.goal)}</div><ul>${(f.actions || []).map((a) => `<li>${esc(a)}</li>`).join("")}</ul></div>`).join("");
+  box.innerHTML = `<h4>运营包 <span class="tag">对外公开课</span></h4>
+    <div class="deliv-sub">把成型的课程包转成可招生、可交付、可跟踪的运营方案。</div>
+    <div class="ops-sec"><h5>受众定位与核心卖点</h5><p>${esc(o.audience_positioning || "")}</p></div>
+    <div class="ops-sec"><h5>差异化卖点</h5><ul>${sp}</ul></div>
+    <div class="ops-sec"><h5>推出方式</h5><ul>${pc}</ul></div>
+    <div class="ops-sec"><h5>课前预热</h5><ul>${pre}</ul></div>
+    <div class="ops-sec"><h5>课后行为迁移跟进（30-60-90 天）</h5>${fu}</div>`;
+}
+
 /* ==================== 知识库 ==================== */
 const DOMAIN_NAMES = {
   STRAT: "战略思维", TEAM: "团队领导", CHANGE: "变革管理",
@@ -1857,7 +2063,7 @@ async function loadRuns() {
 }
 $("btn-close-detail").onclick = () => $("run-detail").classList.add("hidden");
 
-/* ==================== Tab 5：TOKEN 消耗 ==================== */
+/* ==================== Tab 6：TOKEN 消耗 ==================== */
 async function loadTokens() {
   let data = { global: {}, by_run: [] };
   try { data = await (await api("/api/v1/tokens")).json(); } catch (_) { data = { global: {}, by_run: [] }; }

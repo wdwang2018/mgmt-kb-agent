@@ -370,6 +370,81 @@ def domain_name(code: str) -> str:
     return COMPETENCY_DOMAINS[code]["name"]
 
 
+# ---------------------------------------------------------------------------
+# 测验题库（#2）：从课程包生成结构化题库 + 规则化自动评分
+# ---------------------------------------------------------------------------
+class QuizItem(BaseModel):
+    """一道测验题：支持单选题（mcq）与情境判断题（sjt）。
+
+    与既有 AssessmentItem（SJT/case/rubric 评估量规）区分：本题库面向
+    「课前自测 / 课后考核」的可机评场景，必须有唯一可判定答案（answer_index），
+    才能支撑自动评分。AssessmentItem 的 answer_index 可为 None（开放题），二者并存。
+    """
+
+    id: str
+    kind: Literal["mcq", "sjt"] = "mcq"
+    stem: str
+    options: list[str] = Field(default_factory=list, description="选项文本（mcq 用，sjt 可空）")
+    answer_index: Optional[int] = Field(default=None, description="正确选项下标；评分依据")
+    bloom: int = Field(default=2, ge=1, le=5, description="布鲁姆认知层级")
+    explanation: str = Field(default="", description="答案解析（含依据/引用）")
+    module_id: str = ""
+    unit_ids: list[str] = Field(default_factory=list, description="本题关联的知识单元（溯源）")
+
+
+# ---------------------------------------------------------------------------
+# 运营包（#3）：对外公开课的招生 / 课前预热 / 课后行为迁移跟进
+# ---------------------------------------------------------------------------
+class PromotionChannel(BaseModel):
+    """一种推广方式：渠道 + 具体动作 + 适配说明。"""
+
+    channel: str = Field(description="渠道，如「视频号短视频」「企业内训邀约」")
+    method: str = Field(description="具体打法，如「发布 60 秒管理场景剧+评论区领大纲」")
+    fit: str = Field(default="", description="适配场景/说明")
+
+
+class FollowupPhase(BaseModel):
+    """课后行为迁移的一个阶段（30/60/90 天）。"""
+
+    phase: str = Field(description="阶段标识，如 30 / 60 / 90")
+    goal: str = Field(description="本阶段目标")
+    actions: list[str] = Field(default_factory=list, description="具体跟进动作")
+
+
+class OperationsPlan(BaseModel):
+    """运营包：把成型的课程包转成「可招生、可交付、可跟踪」的运营方案。
+
+    设计取向（对外公开课口径）：不替代课程设计，只补「推向市场与落地跟进」这一段，
+    让讲师拿到课程包后能直接用于招生与训后迁移追踪。
+    """
+
+    audience_positioning: str = Field(default="", description="受众定位与核心卖点（一句话）")
+    selling_points: list[str] = Field(default_factory=list, description="课程差异化卖点（3-5 条）")
+    promotion_channels: list[PromotionChannel] = Field(default_factory=list)
+    pre_class_prep: list[str] = Field(default_factory=list, description="课前预热/准备动作")
+    post_class_followup: list[FollowupPhase] = Field(default_factory=list, description="课后 30-60-90 行为迁移跟进")
+
+
+# ---------------------------------------------------------------------------
+# 知识库对话（#1）：RAG 问答响应——答案 + 可溯源引用
+# ---------------------------------------------------------------------------
+class KBChatSource(BaseModel):
+    """一条被引用的知识单元摘要，供前端列出「参考来源」。"""
+
+    unit_id: str
+    title: str
+    citation: str = Field(description="人类可读引用串，如「Hill《成为管理者》第2章」")
+    evidence_level: str = ""
+    snippet: str = Field(default="", description="要点摘取（非原文复制）")
+
+
+class KBChatResponse(BaseModel):
+    """知识库问答响应：答案文本 + 引用来源。"""
+
+    answer: str
+    sources: list[KBChatSource] = Field(default_factory=list)
+
+
 def dilemma_name(code: str) -> str:
     return DILEMMA_INDEX[code]
 
