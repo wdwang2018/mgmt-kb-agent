@@ -7,6 +7,7 @@
 - GET  /api/v1/runs                     运行记录列表（扫描 runs 目录）
 - GET  /api/v1/runs/{run_id}            查询运行状态
 - GET  /api/v1/runs/{run_id}/package.md 下载课程包 Markdown
+- GET  /api/v1/runs/{run_id}/materials 课前预热物料一键导出（Word+PPT+PDF 打包 zip）
 - GET  /api/v1/kb/units                 知识单元检索（域/困境/关键词）
 - GET  /api/v1/archetypes               课程原型列表
 - POST /api/v1/kb/ingest                提交语料，跑知识流水线（P1）
@@ -25,15 +26,16 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from ..domain.models import ArticleSource, TrainingNeed
+from ..domain.models import ArticleSource, CoursePackage, TrainingNeed
 from ..domain.constants import COURSE_TYPES, THEORY_LINEAGE
 from ..services.article_analyzer import analyze_article as _analyze_article
 from ..services.article_intake import (IntakeError, intake_bytes, intake_paste,
                                        intake_url)
+from ..services.course_materials import build_brochure, build_materials_zip
 from ..observability.metrics import metrics
 from ..services.context import AppContext, build_context
 from .observability import install_observability, observability_config_from_env
@@ -210,6 +212,34 @@ def get_package_md(run_id: str):
     if not md_file.exists():
         raise HTTPException(404, "课程包尚未生成（流水线未完成）")
     return PlainTextResponse(md_file.read_text(encoding="utf-8"))
+
+
+@app.get("/api/v1/runs/{run_id}/materials")
+def export_materials(run_id: str):
+    """课前预热物料一键导出：Word + PPT + PDF 打包成 zip 返回。
+
+    纯数据转换（由已落盘的课程包 package.json 派生），不调用 LLM，
+    故离线 Mock 模式也可一键生成。供 Web「一键生成预热物料」按钮消费。
+    """
+    import io as _io
+
+    c = _ctx()
+    pkg_file = c.output_dir / run_id / "package.json"
+    if not pkg_file.exists():
+        raise HTTPException(404, "课程包尚未生成（流水线未完成，无法生成预热物料）")
+    try:
+        data = json.loads(pkg_file.read_text(encoding="utf-8"))
+        pkg = CoursePackage.model_validate(data)
+        bro = build_brochure(pkg)
+        zb = build_materials_zip(bro, run_id)
+    except Exception as e:  # 物料渲染失败不应拖垮整个请求链路
+        raise HTTPException(500, f"物料生成失败：{e}") from e
+    safe = run_id.replace("/", "_")
+    return StreamingResponse(
+        _io.BytesIO(zb),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{safe}-warmup.zip"'},
+    )
 
 
 @app.get("/api/v1/kb/units")

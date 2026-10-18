@@ -13,8 +13,13 @@ pytest>=8.0             # 测试
 # 其余摄入方式与系统主体不受影响，绝不 500 崩。
 python-multipart>=0.0.9  # FastAPI UploadFile 硬依赖，缺则 multipart 上传直接 422
 lxml>=5.0                # URL 正文抽取（启发式：取正文密度最大的文本块）
-python-docx>=1.1         # .docx 正文抽取
+python-docx>=1.1         # .docx 正文抽取（P6 摄入；P7 亦用于物料渲染）
 pdfminer.six>=20240706   # .pdf 正文抽取
+
+# ---- 课前预热物料导出（P7：一键生成 Word / PPT / PDF）----
+# 纯数据转换、不调 LLM；中文 CJK 字体：docx/pptx 显式设东亚字体，pdf 用 reportlab 内置 STSong-Light CID 字体（无需字体文件）。
+python-pptx>=1.0         # 宣传/预热幻灯片
+reportlab>=4.0           # 可打印 PDF（UnicodeCIDFont 支持中文）
 
 # ---- 以下为可选增强依赖：装失败不影响启动，工厂自动降级（healthz 暴露降级原因）----
 # 向量检索（VECTOR_MODE=milvus|hybrid 时生效；缺省 memory 纯 BM25 离线可跑）

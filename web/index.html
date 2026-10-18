@@ -583,6 +583,7 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
               <div>
                 <button class="btn btn-sm" id="btn-again">重新生成</button>
                 <button class="btn btn-sm btn-primary" id="btn-download">下载 Markdown</button>
+                <button class="btn btn-sm" id="btn-warmup">一键生成预热物料</button>
               </div>
             </div>
             <div class="stat-row" id="done-stats"></div>
@@ -1483,6 +1484,29 @@ $("btn-download").onclick = () => {
   a.download = (currentRun ? currentRun.run_id : "course-package") + ".md";
   a.click();
   URL.revokeObjectURL(a.href);
+};
+
+// 一键生成课前预热物料（Word + PPT + PDF 打包 zip）。纯数据转换，离线亦可。
+$("btn-warmup").onclick = async () => {
+  if (!currentRun) return;
+  const btn = $("btn-warmup");
+  const old = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "生成中…";
+  try {
+    const r = await api("/api/v1/runs/" + encodeURIComponent(currentRun.run_id) + "/materials");
+    const blob = await r.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = currentRun.run_id + "-warmup.zip";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } catch (e) {
+    alert("生成失败：" + ((e && e.message) || e));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = old;
+  }
 };
 $("btn-again").onclick = () => show("res-empty");
 $("btn-retry").onclick = () => show("res-empty");
