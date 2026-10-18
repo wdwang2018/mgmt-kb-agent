@@ -12,7 +12,7 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
-from .constants import COMPETENCY_DOMAINS, DILEMMA_INDEX, EVIDENCE_LEVELS
+from .constants import COMPETENCY_DOMAINS, COURSE_TYPES, DILEMMA_INDEX, EVIDENCE_LEVELS
 
 
 # ---------------------------------------------------------------------------
@@ -275,6 +275,69 @@ class CoursePackage(BaseModel):
     gates: list[GateReport] = Field(default_factory=list)
     citations: list[str] = Field(default_factory=list, description="引用清单（书名+定位）")
     human_reviewed: bool = False
+
+
+class ArticleSource(str, Enum):
+    """文章摄入来源。"""
+
+    PASTE = "paste"
+    URL = "url"
+    FILE = "file"
+
+
+class ArticleAnalysis(BaseModel):
+    """文章解析产物：读完一篇文章，判断它能否成课、该做成哪种课。
+
+    语义边界（与语料层同源）：summary 是「要点化转述」，不是原文摘录。
+    对外展示时不得把 summary 当作原文引用——那会假装我们持有原文。
+    """
+
+    source: ArticleSource
+    title: str = Field(description="识别出的文章标题；无法确定时给推测标题")
+    summary: list[str] = Field(description="3-5 条要点（要点化转述，非原文摘录）")
+    core_concepts: list[str] = Field(default_factory=list, description="核心概念，用于回查库内知识单元")
+
+    domains: list[str] = Field(default_factory=list, description="命中能力域代码")
+    dilemmas: list[str] = Field(default_factory=list, description="命中困境代码 D01-D24")
+    lineages: list[str] = Field(default_factory=list, description="命中学派谱系代码 L-*")
+    evidence_level: str = Field(default="C", description="A/B/C 证据等级")
+
+    feasible: bool = Field(description="能否做成课件")
+    feasibility_reason: str = Field(description="判定理由（可行则说依据，不可行则说缺什么）")
+    course_type: str = Field(default="HALF_DAY", description="推荐课件类型代码")
+    related_units: list[str] = Field(default_factory=list, description="关联的知识单元 id")
+
+    audience_reco: str = Field(default="", description="推荐受众画像（对外公开课文风）")
+    suggested_theme: str = Field(default="", description="建议填 theme_hint")
+    suggested_pain: str = Field(default="", description="建议填 business_pain")
+    suggested_behavior: str = Field(default="", description="建议填 desired_behavior")
+    # 三个数值建议一律 Optional + None：给出建议才注入，否则保留用户手填值。
+    # 若用默认值（180/30/2），fill_training_need 的 if 判断恒为真，会把用户
+    # 手填的时长与班型强行覆盖掉——宁可 None 也不猜。
+    suggested_duration: Optional[int] = Field(default=None, description="建议时长（分钟）")
+    suggested_headcount: Optional[int] = Field(default=None, description="建议班型人数（公开课典型 20-40）")
+    suggested_level: Optional[int] = Field(default=None, ge=1, le=5, description="建议受众层级 L1-L5")
+
+    warnings: list[str] = Field(default_factory=list, description="提示：抓取失败/过短/证据不足等")
+    raw_chars: int = Field(default=0, description="摄入正文字符数（用于判断是否过短/超长被截断）")
+
+    def fill_training_need(self, need: "TrainingNeed") -> "TrainingNeed":
+        """把解析结论注入需求诊断单，供课程设计流水线直接消费。"""
+        if self.suggested_theme:
+            need.theme_hint = self.suggested_theme
+        if self.suggested_pain:
+            need.business_pain = self.suggested_pain
+        if self.suggested_behavior:
+            need.desired_behavior = self.suggested_behavior
+        if self.audience_reco:
+            need.audience = self.audience_reco
+        if self.suggested_duration:
+            need.duration_minutes = self.suggested_duration
+        if self.suggested_headcount:
+            need.headcount = self.suggested_headcount
+        if self.suggested_level:
+            need.audience_level = self.suggested_level
+        return need
 
 
 def domain_name(code: str) -> str:

@@ -24,13 +24,16 @@ import json
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from ..domain.models import TrainingNeed
-from ..domain.constants import THEORY_LINEAGE
+from ..domain.models import ArticleSource, TrainingNeed
+from ..domain.constants import COURSE_TYPES, THEORY_LINEAGE
+from ..services.article_analyzer import analyze_article as _analyze_article
+from ..services.article_intake import (IntakeError, intake_bytes, intake_paste,
+                                       intake_url)
 from ..observability.metrics import metrics
 from ..services.context import AppContext, build_context
 from .observability import install_observability, observability_config_from_env
@@ -362,6 +365,80 @@ def kb_corpus(unit_id: str = ""):
              "ingested_by": ch.ingested_by,  # manual=人工采集 / backfill=由单元回填
              "status": ch.status, "text_preview": ch.text[:120]}
             for ch in chunks]
+
+
+# ---------------------------------------------------------------------------
+# 文章解析（P6）：文章 → 摘要/归类/成课可行性 → 一键填进课程设计需求单
+# ---------------------------------------------------------------------------
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+
+
+class AnalyzeBody(BaseModel):
+    """文章解析请求：粘贴全文或给 URL，二者择一，不可都给也不可都不给。"""
+
+    text: str | None = Field(default=None, description="文章全文")
+    url: str | None = Field(default=None, description="文章链接")
+
+
+# 摄入失败原因 → HTTP 状态码。刻意细分：一律 500 会让用户分不清
+# 「链接抓不到」「格式不支持」「服务端缺依赖」这三类完全不同的问题。
+_INTAKE_STATUS = {
+    "empty_text": 400, "empty_url": 400, "empty_file": 400, "bad_url": 400,
+    "forbidden_host": 403,
+    "unsupported_format": 415,
+    "dep_missing": 501,        # 服务端能力缺失，不是用户的问题
+    "fetch_failed": 502,
+    "no_text": 422, "bad_file": 422,
+}
+
+
+def _analysis_payload(a) -> dict:
+    """补上课件类型的中文名。
+
+    刻意由后端补而不是前端硬编码一张映射表：课件类型名的单一数据源在
+    constants.COURSE_TYPES，前端再抄一份就会两处漂移。
+    """
+    d = a.model_dump()
+    d["course_type_name"] = COURSE_TYPES.get(a.course_type, {}).get("name", a.course_type)
+    return d
+
+
+@app.post("/api/v1/analyze")
+def analyze_article_api(body: AnalyzeBody):
+    """解析一篇文章：摘要 / 归类 / 成课可行性 / 需求建议。
+
+    刻意不并入课程设计流水线：那条链路在线一轮 12–14 分钟，而解析必须即时反馈
+    （用户要看完判断才决定要不要成课）。这是单次 LLM 调用的轻量端点。
+    """
+    if bool(body.text) == bool(body.url):
+        raise HTTPException(400, "text 与 url 必须且只能提供一个")
+    c = _ctx()
+    try:
+        if body.url:
+            text, warns = intake_url(body.url)
+            source = ArticleSource.URL
+        else:
+            text, warns = intake_paste(body.text or "")
+            source = ArticleSource.PASTE
+    except IntakeError as e:
+        raise HTTPException(_INTAKE_STATUS.get(e.code, 422),
+                            f"[{e.code}] {e.message}") from e
+    return _analysis_payload(_analyze_article(text, source, c.llm, c.retriever, warns))
+
+
+@app.post("/api/v1/analyze/file")
+async def analyze_article_file(file: UploadFile = File(...)):
+    """上传文件解析（txt / md / docx / pdf）。"""
+    data = await file.read()
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, f"文件过大（上限 {MAX_UPLOAD_BYTES // 1024 // 1024} MB）")
+    c = _ctx()
+    try:
+        text, warns = intake_bytes(file.filename or "", data)
+    except IntakeError as e:
+        raise HTTPException(_INTAKE_STATUS.get(e.code, 422),
+                            f"[{e.code}] {e.message}") from e
+    return _analysis_payload(_analyze_article(text, ArticleSource.FILE, c.llm, c.retriever, warns))
 
 
 # Web 工作台静态挂载：API 路由均注册在前，优先匹配；其余路径回落 web/index.html

@@ -143,6 +143,44 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
 .form-actions{display:flex;gap:10px;margin-top:16px}
 .form-actions .btn{flex:1}
 
+/* —— P6 原文素材区（可选·默认折叠）：纸感底 + 细描边 + 衬线标题，不加装饰 —— */
+.src-panel{border:1px solid var(--rule);border-radius:var(--r-md);background:var(--paper-2);margin-bottom:16px}
+.src-panel>summary{
+  list-style:none;cursor:pointer;padding:11px 14px;display:flex;align-items:baseline;
+  gap:10px;flex-wrap:wrap;font-family:var(--font-serif);font-size:13.5px;color:var(--ink);
+}
+.src-panel>summary::-webkit-details-marker{display:none}
+.src-panel[open]>summary{border-bottom:1px solid var(--rule)}
+.sp-title{font-weight:600;letter-spacing:.02em}
+.sp-hint{font-family:var(--font-sans);font-size:12px;color:var(--text-3)}
+.src-body{padding:12px 14px 14px}
+.seg{display:flex;width:fit-content;border:1px solid var(--rule-2);border-radius:var(--r-sm);overflow:hidden}
+.seg-btn{
+  padding:5px 14px;font-size:12.5px;border:0;border-right:1px solid var(--rule-2);
+  background:var(--paper);color:var(--text-2);
+}
+.seg-btn:last-child{border-right:0}
+.seg-btn.is-on{background:var(--ink);color:#fff}
+.src-pane{margin-top:10px}
+.src-actions{display:flex;align-items:center;gap:10px;margin-top:10px}
+.src-note{font-size:12px;color:var(--text-3);line-height:1.6}
+
+/* 解析结果卡片 */
+.ana{margin-top:12px;border-top:1px solid var(--rule);padding-top:12px}
+.ana-title{font-family:var(--font-serif);font-size:14.5px;line-height:1.5;color:var(--text);margin-bottom:8px}
+.ana-sum{margin:0 0 10px;padding-left:17px;font-size:13px;line-height:1.75;color:var(--text-2)}
+.ana-meta{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.ana-meta .tag{font-size:11.5px}
+.ana-tip{
+  font-size:12.5px;line-height:1.7;padding:8px 10px;margin-bottom:10px;
+  border-left:2px solid var(--ink);background:var(--ink-soft);color:var(--text);
+}
+.ana-tip.is-no{border-left-color:var(--brick);background:var(--brick-soft)}
+.ana-facts{font-size:12.5px;color:var(--text-2);line-height:1.8;margin-bottom:8px}
+.ana-facts b{color:var(--text);font-weight:600}
+.ana-rel{font-size:12px;color:var(--text-3);line-height:1.7;margin-bottom:10px}
+.ana-act{display:flex;gap:8px;flex-wrap:wrap}
+
 .result-area{display:flex;flex-direction:column;gap:14px;min-height:400px}
 .empty-hint{color:var(--text-2);text-align:center;padding:60px 20px;border-style:dashed}
 .empty-hint .big{font-size:15px;color:var(--text);margin-bottom:6px;font-weight:600}
@@ -400,6 +438,41 @@ main{flex:1;overflow-y:auto;padding:20px 24px}
     <section id="tab-design" class="tab active">
       <div class="design-grid">
         <form id="need-form" class="card form-card">
+          <!-- P6 原文素材：可选入口，默认折叠，不打扰既有流程 -->
+          <details id="src-panel" class="src-panel">
+            <summary>
+              <span class="sp-title">从文章导入（可选）</span>
+              <span class="sp-hint">粘贴全文 / 给链接 / 上传文件 → 解析后一键填入需求单</span>
+            </summary>
+            <div class="src-body">
+              <div class="seg">
+                <button type="button" class="seg-btn is-on" data-src="paste">粘贴全文</button>
+                <button type="button" class="seg-btn" data-src="url">文章链接</button>
+                <button type="button" class="seg-btn" data-src="file">上传文件</button>
+              </div>
+
+              <div class="src-pane" data-pane="paste">
+                <textarea id="src-text" rows="6"
+                  placeholder="把文章正文粘贴到这里。内容越完整，归类与成课判断越可靠（短文会被判定为不足以成课）。"></textarea>
+              </div>
+              <div class="src-pane hidden" data-pane="url">
+                <input id="src-url" type="url" placeholder="https://example.com/article">
+                <div class="src-note" style="margin-top:6px">需登录、纯前端渲染或正文在图片内的站点会抓不到，届时如实提示。</div>
+              </div>
+              <div class="src-pane hidden" data-pane="file">
+                <input id="src-file" type="file" accept=".txt,.md,.markdown,.docx,.pdf">
+                <div class="src-note" style="margin-top:6px">支持 txt / md / docx / pdf。扫描件图片型 PDF 提不出文字。</div>
+              </div>
+
+              <div class="src-actions">
+                <button type="button" class="btn btn-sm btn-primary" id="btn-analyze">解析文章</button>
+                <span class="src-note" id="src-note"></span>
+              </div>
+
+              <div id="src-result" class="hidden"></div>
+            </div>
+          </details>
+
           <h2>需求诊断单 <span class="tag">七要素</span></h2>
           <label>培训对象
             <input id="f-audience" required placeholder="如：新任经理（晋升 6 个月内）">
@@ -1139,6 +1212,146 @@ $("btn-demo-fill").onclick = () => {
 document.querySelectorAll(".chip[data-min]").forEach((c) => {
   c.onclick = () => { $("f-duration").value = c.dataset.min; };
 });
+
+/* ==================== P6 原文素材：解析文章 → 填入需求单 ==================== */
+let srcMode = "paste";
+let srcTaxo = null;
+let srcLast = null;
+
+document.querySelectorAll(".seg-btn[data-src]").forEach((b) => {
+  b.onclick = () => {
+    srcMode = b.dataset.src;
+    document.querySelectorAll(".seg-btn[data-src]").forEach((x) =>
+      x.classList.toggle("is-on", x === b));
+    document.querySelectorAll(".src-pane").forEach((p) =>
+      p.classList.toggle("hidden", p.dataset.pane !== srcMode));
+    $("src-note").textContent = "";
+  };
+});
+
+// 困境共 24 条，不在前端硬编码；从受控代码表取，单一数据源留在后端
+async function srcTaxonomy() {
+  if (!srcTaxo) srcTaxo = await (await api("/api/v1/kb/taxonomy")).json();
+  return srcTaxo;
+}
+
+function srcDilemmaName(code, taxo) {
+  const hit = ((taxo && taxo.dilemmas) || []).find((d) => d.code === code);
+  return hit ? hit.name : code;
+}
+
+function srcSetSelect(sel, val) {
+  if (!val) return;
+  // 主题下拉是固定选项集，解析出的新主题不在其中时动态补一个，避免静默落回「自动识别」
+  if (!Array.from(sel.options).some((o) => o.value === val)) {
+    const o = document.createElement("option");
+    o.value = val; o.textContent = val;
+    sel.appendChild(o);
+  }
+  sel.value = val;
+}
+
+$("btn-analyze").onclick = async () => {
+  const note = $("src-note"), btn = $("btn-analyze");
+  note.textContent = "";
+  $("src-result").classList.add("hidden");
+  btn.disabled = true; btn.textContent = "解析中…";
+  try {
+    let res;
+    if (srcMode === "paste") {
+      const text = $("src-text").value.trim();
+      if (!text) { note.textContent = "请先粘贴文章正文"; return; }
+      res = await api("/api/v1/analyze", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+    } else if (srcMode === "url") {
+      const url = $("src-url").value.trim();
+      if (!url) { note.textContent = "请先填写文章链接"; return; }
+      res = await api("/api/v1/analyze", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+    } else {
+      const f = $("src-file").files[0];
+      if (!f) { note.textContent = "请先选择文件"; return; }
+      const fd = new FormData();
+      fd.append("file", f);
+      // FormData 刻意不设 Content-Type：boundary 必须由浏览器自动带上
+      res = await api("/api/v1/analyze/file", { method: "POST", body: fd });
+    }
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      note.textContent = (data && data.detail) || `解析失败（HTTP ${res.status}）`;
+      return;
+    }
+    srcLast = data;
+    await renderAnalysis(data);
+  } catch (e) {
+    note.textContent = "解析失败：" + ((e && e.message) || e);
+  } finally {
+    btn.disabled = false; btn.textContent = "解析文章";
+  }
+};
+
+async function renderAnalysis(a) {
+  const taxo = await srcTaxonomy().catch(() => null);
+  const tags = [];
+  (a.domains || []).forEach((c) =>
+    tags.push(`<span class="tag">${esc(DOMAIN_NAMES[c] || c)}</span>`));
+  (a.dilemmas || []).forEach((c) =>
+    tags.push(`<span class="tag">${esc(srcDilemmaName(c, taxo))}</span>`));
+  (a.lineages || []).forEach((c) =>
+    tags.push(`<span class="tag">${esc(LINEAGE_NAMES[c] || c)}</span>`));
+  tags.push(`<span class="tag">证据 ${esc(a.evidence_level)} 级</span>`);
+
+  const sums = (a.summary || []).map((s) => `<li>${esc(s)}</li>`).join("");
+  const facts = [];
+  if (a.course_type_name) facts.push(`建议课型 <b>${esc(a.course_type_name)}</b>`);
+  if (a.suggested_duration) facts.push(`时长 <b>${a.suggested_duration}</b> 分钟`);
+  if (a.suggested_headcount) facts.push(`班型 <b>${a.suggested_headcount}</b> 人`);
+  if (a.suggested_level) facts.push(`受众层级 <b>L${a.suggested_level}</b>`);
+  if (a.audience_reco) facts.push(`受众 <b>${esc(a.audience_reco)}</b>`);
+
+  const rel = (a.related_units || []).length
+    ? `库内已有可参考的单元：${(a.related_units || []).map((u) => esc(u)).join("、")}`
+    : "未在库内命中可引用的知识单元（不影响成课，只是本次无现成内容可复用）";
+  const warns = (a.warnings || []).map((w) => `<div class="ana-tip is-no">${esc(w)}</div>`).join("");
+
+  $("src-result").innerHTML = `
+    <div class="ana">
+      <div class="ana-title">${esc(a.title)}</div>
+      ${warns}
+      <ol class="ana-sum">${sums}</ol>
+      <div class="ana-meta">${tags.join("")}</div>
+      <div class="ana-tip ${a.feasible ? "" : "is-no"}">
+        <b>${a.feasible ? "可以成课" : "暂不建议成课"}</b>：${esc(a.feasibility_reason)}
+      </div>
+      ${facts.length ? `<div class="ana-facts">${facts.join(" · ")}</div>` : ""}
+      <div class="ana-rel">${rel}</div>
+      <div class="ana-act">
+        <button type="button" class="btn btn-sm btn-primary" id="btn-src-fill">填入需求单</button>
+        <button type="button" class="btn btn-sm" id="btn-src-close">收起</button>
+      </div>
+    </div>`;
+  $("src-result").classList.remove("hidden");
+
+  $("btn-src-close").onclick = () => {
+    $("src-result").classList.add("hidden");
+  };
+  $("btn-src-fill").onclick = () => {
+    // 与后端 fill_training_need 同规则：有值才覆盖，没有就保留用户手填
+    if (a.audience_reco) $("f-audience").value = a.audience_reco;
+    if (a.suggested_level) $("f-level").value = String(a.suggested_level);
+    if (a.suggested_headcount) $("f-headcount").value = String(a.suggested_headcount);
+    if (a.suggested_duration) $("f-duration").value = String(a.suggested_duration);
+    if (a.suggested_theme) srcSetSelect($("f-theme"), a.suggested_theme);
+    if (a.suggested_pain) $("f-pain").value = a.suggested_pain;
+    if (a.suggested_behavior) $("f-desired").value = a.suggested_behavior;
+    $("src-note").textContent = "已填入需求单，可自行修改后再生成课程包";
+    $("src-panel").open = false;
+  };
+}
 
 $("need-form").onsubmit = async (e) => {
   e.preventDefault();

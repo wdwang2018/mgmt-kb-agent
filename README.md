@@ -119,6 +119,10 @@ cd backend && "$PY" -m pytest
 # GET  /api/v1/kb/taxonomy       受控代码表（六域/24 困境/证据等级/版权状态）
 # GET  /api/v1/kb/graph/{unit_id}  知识图谱查询（前置链/提出者/学派/争议/案例/邻居）
 # GET  /api/v1/kb/graph-stats    图规模统计
+# POST /api/v1/analyze           解析一篇文章 {"text": "..."} 或 {"url": "..."}（二选一）
+# POST /api/v1/analyze/file      multipart 上传解析（txt/md/docx/pdf）
+#                                返回：摘要 / 能力域·困境·学派归类 / 证据等级 /
+#                                      成课可行性 / 推荐课型 / 关联知识单元 / 需求建议
 
 # 5. 黄金评测（改模型/改门禁后必跑，不达标不上线）
 cd .. && "$PY" eval/run_eval.py
@@ -478,6 +482,12 @@ curl localhost:8932/api/v1/kb/graph-stats            # 节点与关系边规模
 - **P4 理论谱系 + 国内外书库系统收集**：✅ 已落地——新增 `lineage` 学派谱系字段（双轴索引之一，与能力域×困境正交）+ `THEORY_LINEAGE` 八主干常量（古典/行为科学/权变系统/战略/领导力发展/质量精益/组织学习/中国管理学）；系统补齐知识单元 26→45（新增古典管理 4 / 行为科学·激励 6 / 质量·系统 2 / 中国管理学 7，含曾仕强·陈春花·席酉民·华为·海尔·联想·稻盛和夫等），全部回填 lineage；核心书目 38→69（含 Taylor/Fayol/Weber/Mayo/Maslow/McGregor/Herzberg/Vroom/Adams/Deming/Senge 等国际名家 + 曾仕强/陈春花/席酉民/苏东水/张瑞敏/宋志平/宁高宁等中国名家）；Web 知识库页新增「学派谱系」筛选下拉 + 卡片谱系标签。黄金评测七项仍 100%、pytest 158 全过
 - **P5 剩余 P1 书要点化 + 学派演进图谱**：✅ 已落地——将剩余 P1 待要点化书（Fiedler/House/Mintzberg/Simon/Kotter/Kouzes/Greenleaf/Collins/Charan/Covey/Buckingham/Drucker/Chandler/Christensen/Kim/Trout/Slywotzky/Pink/Kahneman/Cialdini/Dweck/Lencioni/Ohno/Nonaka/苏东水/宋志平/宁高宁/田涛 等 28 本）转为知识单元，总数 45→73；新增 `L-DECISION` 决策科学学派 + `CONT`/`DEC`/`LDS` 三个 ID 前缀；Web 知识库页新增「📊 学派演进图谱」视图（横向时序主干 + 9 学派节点 + 各学派单元卡片，点击下钻到卡片检索）；新增 `GET /api/v1/kb/lineages` 端点。黄金评测七项仍 100%、pytest 158 全过
 - **P5 L1 语料层回填（要点级溯源）**：✅ 已落地——原先单元只能溯源到「书 + 章节」，且 corpus 仅 2 条样例。现由 `scripts/backfill_corpus.py` 为每个单元的每条要点生成一条 `CC` 语料（292 条，总计 294），带该单元 `source.locator` 并以 `unit_id` 回链；`CorpusChunk` 新增 `unit_id` 字段，`GET /api/v1/kb/corpus?unit_id=KU-xxx` 支持反查。**重要语义边界**：回填内容是「要点化转述」而非原书逐字摘录（`CorpusChunk.text` 的 schema 即规定「不整文复制」），一律标记 `ingested_by="backfill"` 以区别于人工采集；日后拿到真书原文可整条替换。脚本幂等，改动单元要点后须重跑（有测试守红）。pytest 165 全过、黄金评测七项 100%
+- **P6 文章 → 课件（解析入口）**：✅ 已落地——场景：看到一篇文章，想判断它能否做成一门对外公开课。Web「课程设计」页顶部新增**默认折叠**的「从文章导入（可选）」区，支持粘贴全文 / 文章链接 / 上传文件（txt·md·docx·pdf）三路摄入，解析后展示摘要、能力域×困境×学派归类、证据等级、成课可行性与理由、推荐课型、库内可复用的知识单元，一键填入需求诊断单。
+  - **关键设计：解析走独立端点而非流水线节点**——课程设计流水线在线一轮 12–14 分钟，而解析必须即时反馈（用户要看完判断才决定要不要成课），故为单次 LLM 调用的轻量端点 `POST /api/v1/analyze`。
+  - **零新增依赖**：URL 用项目已有的 httpx + lxml 启发式正文抽取；docx 用 python-docx；pdf 用 pdfminer.six。依赖缺失时对应摄入方式优雅报错（415/501），不影响系统主体。
+  - **版权边界（与语料层同源）**：解析产出的 `summary` 是要点化转述，**不是原文摘录**，对外不得当作原文引用。
+  - 实测踩坑记录：① SSRF 防护若用 `ip.is_private` 会把 `2001::/23`（IETF 协议分配段）整段误判为私有，**误杀 en.wikipedia.org**，改用精确清单；② 正文抽取若给 `<article>` 加长度门槛，短小但正确的正文会被否决并落到「拼接所有 p」的兜底，**反而吸进广告**；③ 摘要规范化若复用为代码列表设计的切分函数，会把「所谓准备度，由能力与意愿两个维度构成」按逗号切成碎句。三者均有测试守红。
+  - 质量门：pytest 191 全过（新增 26 例，含 14 项变异验证）、黄金评测七项 100%、无浏览器渲染校验 29/29、HTTP 页面断言 16/16
 
 ## 约定
 

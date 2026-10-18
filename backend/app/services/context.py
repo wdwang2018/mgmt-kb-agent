@@ -14,7 +14,7 @@ from ..adapters.retriever_factory import get_retriever
 from ..graph.checkpoint import build_checkpointer
 from ..graph.knowledge_nodes import KBNodeDeps
 from ..graph.nodes import NodeDeps
-from ..ports import Retriever
+from ..ports import LLMClient, Retriever
 from .kb_pipeline import KnowledgePipeline
 from .pipeline import CourseDesignPipeline
 
@@ -49,6 +49,10 @@ class AppContext:
     store: JsonKnowledgeStore
     corpus_store: JsonCorpusStore
     retriever: Retriever
+    # 必须暴露 LLM 本身：文章解析等独立端点要用与流水线**同一个**实例，
+    # 这样 P2 的 token 计量包装与 P3 的故障降级链才对新端点同样生效。
+    # 若端点自己另起一个 get_llm()，计量会漏算、降级链也会被绕过。
+    llm: LLMClient
     pipeline: CourseDesignPipeline
     kb_pipeline: KnowledgePipeline
     knowledge_dir: Path
@@ -127,6 +131,7 @@ def build_context(knowledge_dir: str | Path | None = None,
     )
     kb_pipeline = KnowledgePipeline(kb_deps, o_dir, checkpointer)
     ctx = AppContext(store=store, corpus_store=corpus_store, retriever=retriever,
+                     llm=llm,
                      pipeline=pipeline, kb_pipeline=kb_pipeline,
                      knowledge_dir=k_dir, output_dir=o_dir,
                      vector_mode=vector_mode, vector_note=vector_note,

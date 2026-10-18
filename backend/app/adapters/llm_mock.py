@@ -19,6 +19,64 @@ from ..ports import LLMClient
 _NEW_MANAGER_KW = ["新任", "新经理", "晋升", "转身", "转型", "角色转换", "从技术到管理", "骨干"]
 _STRATEGY_KW = ["战略", "共识", "解码", "目标对齐", "OKR", "KPI", "落地", "打仗", "战略宣贯"]
 
+# 文章解析（purpose=analyze_article）的规则化关键词表。
+# 只做命中、不做理解——Mock 无法判断文章深浅，故可行判定刻意保守（见 _analyze_article）。
+_ARTICLE_DOMAIN_KW = {
+    "STRAT": ["战略", "竞争优势", "定位", "蓝海", "商业模式", "护城河"],
+    "TEAM": ["团队", "领导力", "领导", "下属", "带人", "班子成员"],
+    "CHANGE": ["变革", "转型", "颠覆式", "创新", "组织变革"],
+    "COMM": ["沟通", "表达", "影响力", "说服", "谈判", "汇报"],
+    "COACH": ["教练", "辅导", "带教", "反馈", "提问", "GROW"],
+    "EXEC": ["执行", "落地", "绩效", "目标管理", "效率", "复盘"],
+}
+_ARTICLE_DILEMMA_KW = {
+    "D01": ["新经理", "角色转型", "晋升", "从骨干到管理", "埋头做事"],
+    "D02": ["授权", "放权", "不敢放", "放了乱"],
+    "D03": ["团队冲突", "内耗", "人际摩擦"],
+    "D04": ["跨部门", "协同", "推不动", "扯皮"],
+    "D05": ["变革阻力", "抵触", "消极对抗"],
+    "D06": ["战略方向", "不知道往哪打"],
+    "D07": ["共识", "各唱各调"],
+    "D08": ["执行断裂", "策略停在", "落不了地"],
+    "D09": ["绩效面谈", "谈分低"],
+    "D10": ["反馈", "说崩", "不说"],
+    "D11": ["激励失效", "留不住心", "加薪也"],
+    "D12": ["骨干流失", "人才保留", "关键人才"],
+    "D13": ["向上沟通", "要资源", "向上管理"],
+    "D14": ["会议低效", "会而不议", "议而不决"],
+    "D15": ["决策拖延", "优柔寡断", "决策质量"],
+    "D16": ["目标设定", "目标对齐", "目标虚设"],
+    "D17": ["时间管理", "优先级", "被事务拖"],
+    "D18": ["新人融入", "文化传承", "融入慢"],
+    "D19": ["远程", "混合团队", "看不见"],
+    "D20": ["危机", "压力应对", "慌乱"],
+    "D21": ["创新推动", "怕犯错", "不试错"],
+    "D22": ["资源争夺", "预算博弈"],
+    "D23": ["问责", "追责", "无人负责"],
+    "D24": ["继任", "人才梯队", "无人可用"],
+}
+_ARTICLE_LINEAGE_KW = {
+    "L-CLASSIC": ["泰勒", "法约尔", "韦伯", "科学管理", "官僚制"],
+    "L-BEHAV": ["马斯洛", "麦格雷戈", "赫茨伯格", "激励理论", "行为科学"],
+    "L-CONTINGENCY": ["权变", "费德勒", "情境领导", "路径-目标", "明茨伯格"],
+    "L-DECISION": ["西蒙", "卡尼曼", "有限理性", "决策科学", "系统1"],
+    "L-STRATEGY": ["波特", "钱德勒", "克里斯坦森", "五种力量"],
+    "L-LEADERSHIP": ["科特", "库泽斯", "格林里夫", "柯林斯", "五级领导"],
+    "L-QUALITY": ["戴明", "精益", "丰田", "大野耐一", "质量管理"],
+    "L-ORGLEARN": ["野中郁次郎", "学习型组织", "SECI", "知识创造"],
+    "L-CHINA": ["曾仕强", "华为", "海尔", "本土管理", "东方管理"],
+}
+
+
+# 正文哨兵标记（与 article_analyzer 的 _USER 模板严格对应）
+_BODY_RE = re.compile(r"【正文】\s*\n(.*?)\n【正文结束】", re.S)
+
+
+def _slice_body(prompt: str) -> str:
+    """从完整 prompt 里切出正文；切不到就原样返回（便于直接拿正文做单测）。"""
+    m = _BODY_RE.search(prompt)
+    return m.group(1).strip() if m else prompt
+
 
 def _pick(options: list[str], seed: str) -> str:
     return options[int(hashlib.md5(seed.encode()).hexdigest(), 16) % len(options)]
@@ -63,6 +121,83 @@ class MockLLM(LLMClient):
             "theme_hint": theme,
         }
 
+    def _analyze_article(self, raw: str, fallback: dict[str, Any]) -> dict[str, Any]:
+        """规则化文章解析：只做关键词命中，不判断文章深浅。
+
+        诚实边界（与在线模型的分工）：
+        - 命中能力域/困境/学派靠关键词表，摘要靠按句截取，二者都是转述的近似而非理解；
+        - 因此 feasible 判定刻意保守：正文够长 **且** 命中已知能力域才判可行，
+          其余一律判不可行并说清缺什么。Mock 不把命中不了的东西包装成能成课。
+        """
+        text = raw or ""
+
+        def hits(table: dict[str, list[str]]) -> list[str]:
+            return [c for c, kws in table.items() if any(k in text for k in kws)]
+
+        domains = hits(_ARTICLE_DOMAIN_KW)
+        dilemmas = hits(_ARTICLE_DILEMMA_KW)
+        lineages = hits(_ARTICLE_LINEAGE_KW)
+
+        # 按句切分（换行不当句子边界）：文章的自然换行会把一句切成两行，
+        # 若把 \n 也算断句，摘要就会是「带了团队之后突然失灵了」这种碎句。
+        sents = [re.sub(r"\s+", " ", s).strip()
+                 for s in re.split(r"[。！？]+", text) if len(s.strip()) >= 8]
+        summary = sents[:4]
+
+        # 课型按正文长度推荐：内容量决定了撑得起多久的课
+        n = len(text)
+        if n < 800:
+            ctype = "MICRO"
+        elif n < 2000:
+            ctype = "SHORT"
+        elif n < 5000:
+            ctype = "HALF_DAY"
+        elif n < 12000:
+            ctype = "FULL_DAY"
+        else:
+            ctype = "SERIES"
+        minutes = {"MICRO": 60, "SHORT": 120, "HALF_DAY": 180,
+                   "FULL_DAY": 360, "SERIES": 720}[ctype]
+
+        long_enough = n >= 300
+        feasible = long_enough and bool(domains)
+        if feasible:
+            reason = f"正文 {n} 字，命中能力域「{'、'.join(domains)}」，具备成课基础"
+        elif not long_enough:
+            reason = f"正文仅 {n} 字，内容量不足以支撑 60 分钟以上的课程"
+        else:
+            reason = "未命中任何已知能力域，课程定位不清晰，需人工确认主题方向"
+
+        # 证据等级：认不出实证依据就取最保守的 C
+        ev = "B" if any(k in text for k in ("研究", "实证", "元分析", "实验")) else "C"
+
+        # 核心概念：取实际命中的关键词本身（去重保序）
+        concepts: list[str] = []
+        for table in (_ARTICLE_DOMAIN_KW, _ARTICLE_LINEAGE_KW):
+            for code in [c for c in table if c in domains or c in lineages]:
+                for k in table[code]:
+                    if k in text and k not in concepts:
+                        concepts.append(k)
+        # 标题取首行：按句切分的第一句会把换行后的正文一起吞进来
+        first_line = text.strip().split("\n")[0].strip()
+        return {
+            "title": (first_line[:40] if first_line else "（未能识别标题）"),
+            "summary": summary,
+            "core_concepts": concepts[:5],
+            "domains": domains, "dilemmas": dilemmas, "lineages": lineages,
+            "evidence_level": ev,
+            "feasible": feasible,
+            "feasibility_reason": reason,
+            "course_type": ctype,
+            "audience_reco": "企业管理者与部门负责人" if feasible else "",
+            "suggested_theme": (concepts[0] if concepts else ""),
+            "suggested_pain": "",
+            "suggested_behavior": "",
+            "suggested_duration": minutes if feasible else None,
+            "suggested_headcount": 30 if feasible else None,
+            "suggested_level": 2 if feasible else None,
+        }
+
     def complete_json(self, purpose: str, system: str, user: str, fallback: dict[str, Any]) -> dict[str, Any]:
         try:
             ctx = json.loads(user) if user.strip().startswith("{") else {"raw": user}
@@ -105,6 +240,9 @@ class MockLLM(LLMClient):
                 "answer_index": pos,
                 "rationale": f"理论证据支持：{correct}",
             }
+
+        if purpose == "analyze_article":
+            return self._analyze_article(_slice_body(ctx.get("raw", "")), fallback)
 
         return fallback
 
