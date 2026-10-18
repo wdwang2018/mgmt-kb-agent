@@ -160,10 +160,10 @@ def test_build_chunks_is_idempotent():
 def test_guess_unit_id_prefers_book_and_author():
     """书名重名时，优先采信作者也命中的那条。"""
     units = [
-        _unit("KU-LEAD-013", "新经理转身", "领导梯队", "Robert Stephen Smith", ["a", "b"]),
-        _unit("KU-LDS-005", "查兰领导梯队", "The Leadership Pipeline 领导梯队", "Ram Charan", ["c", "d"]),
+        _unit("KU-LEAD-013", "新经理转身", "领导梯队", "甲", ["a", "b"]),
+        _unit("KU-LDS-005", "查兰领导梯队", "The Leadership Pipeline 领导梯队", "乙", ["c", "d"]),
     ]
-    chunk = CorpusChunk(id="CC-0009", book="领导梯队", author="Robert Stephen Smith",
+    chunk = CorpusChunk(id="CC-0009", book="领导梯队", author="甲",
                         locator="第3章", text="旧语料")
     assert bf.guess_unit_id(chunk, units) == "KU-LEAD-013"
 

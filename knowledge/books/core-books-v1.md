@@ -12,7 +12,7 @@
 | 3 | 组织行为管理（情境领导） | Hersey & Blanchard | 领导风格随下属准备度 S1-S4 而变 | B | P0已要点化 | 要点化 |
 | 4 | 清晰 Coaching for Performance | John Whitmore | GROW 教练模型；下属自带答案 | B | P0已要点化 | 要点化 |
 | 5 | 管理工作的本质 The Nature of Managerial Work | Henry Mintzberg | 管理者十角色；工作碎片化特征 | B | P0已要点化 | 要点化 |
-| 6 | 领导梯队 The Leadership Pipeline | Charan, Dyer, Noel | 六个领导力阶段的能力转换模型 | B | 已要点化 | 要点化 |
+| 6 | 领导梯队 The Leadership Pipeline | Charan, Drotter & Noel | 六个领导力阶段的能力转换模型 | B | 已要点化 | 要点化 |
 | 7 | 首先，打破一切常规 First, Break All the Rules | Buckingham | 优势管理；聚焦天赋而非补短 | C | 已要点化 | 要点化 |
 | 8 | 领导变革 Leading Change | John P. Kotter | 变革八步法；紧迫感先行 | B | 已要点化 | 要点化 |
 | 9 | 领导力挑战 The Leadership Challenge | Kouzes & Posner | 五种卓越领导行为 | B | 已要点化 | 要点化 |
